@@ -15,9 +15,13 @@ public interface ComercialSpaceRepository extends JpaRepository<ComercialSpace, 
 
     List<ComercialSpace> findBySpaceType(ComercialSpace.SpaceType spaceType);
 
-    List<ComercialSpace> findByOwnerId(Long ownerId);
+    // Schimbat de la findByOwnerId la owner.id pentru a referi corect relația
+    @Query("SELECT cs FROM ComercialSpace cs WHERE cs.owner.id = :ownerId")
+    List<ComercialSpace> findByOwnerId(@Param("ownerId") Long ownerId);
 
-    List<ComercialSpace> findByBuildingId(Long buildingId);
+    // Schimbat de la findByBuildingId la building.id pentru a referi corect relația
+    @Query("SELECT cs FROM ComercialSpace cs WHERE cs.building.id = :buildingId")
+    List<ComercialSpace> findByBuildingId(@Param("buildingId") Long buildingId);
 
     List<ComercialSpace> findByPricePerMonthBetween(Double minPrice, Double maxPrice);
 

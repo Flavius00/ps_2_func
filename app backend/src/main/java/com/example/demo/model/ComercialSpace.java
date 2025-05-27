@@ -4,6 +4,7 @@ import lombok.*;
 import jakarta.persistence.*;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(name = "comercial_spaces")
@@ -43,13 +44,14 @@ public class ComercialSpace {
     @Column(nullable = false)
     private Boolean available = true;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "owner_id")
+    @JsonBackReference // Această parte nu va fi serializată pentru a evita loop-ul
     private Owner owner;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "building_id")
-    @JsonBackReference
+    @JsonBackReference("building-spaces") // Folosim un nume specific pentru această relație
     private Building building;
 
     // Cascadă pentru parking - salvează automat parking-ul când salvează space-ul
@@ -80,6 +82,48 @@ public class ComercialSpace {
 
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<RentalContract> contracts;
+
+    // Metode helper pentru a accesa informațiile owner-ului fără a cauza loop
+    @JsonProperty("ownerId")
+    public Long getOwnerId() {
+        return owner != null ? owner.getId() : null;
+    }
+
+    @JsonProperty("ownerName")
+    public String getOwnerName() {
+        return owner != null ? owner.getName() : null;
+    }
+
+    @JsonProperty("ownerEmail")
+    public String getOwnerEmail() {
+        return owner != null ? owner.getEmail() : null;
+    }
+
+    @JsonProperty("ownerPhone")
+    public String getOwnerPhone() {
+        return owner != null ? owner.getPhone() : null;
+    }
+
+    @JsonProperty("ownerCompanyName")
+    public String getOwnerCompanyName() {
+        return owner != null ? owner.getCompanyName() : null;
+    }
+
+    // Metode helper pentru building
+    @JsonProperty("buildingId")
+    public Long getBuildingId() {
+        return building != null ? building.getId() : null;
+    }
+
+    @JsonProperty("buildingName")
+    public String getBuildingName() {
+        return building != null ? building.getName() : null;
+    }
+
+    @JsonProperty("buildingAddress")
+    public String getBuildingAddress() {
+        return building != null ? building.getAddress() : null;
+    }
 
     public enum SpaceType {
         OFFICE,

@@ -13,9 +13,11 @@ import java.util.Optional;
 @Repository
 public interface RentalContractRepository extends JpaRepository<RentalContract, Long> {
 
-    List<RentalContract> findByTenantId(Long tenantId);
+    @Query("SELECT c FROM RentalContract c WHERE c.tenant.id = :tenantId")
+    List<RentalContract> findByTenantId(@Param("tenantId") Long tenantId);
 
-    List<RentalContract> findBySpaceId(Long spaceId);
+    @Query("SELECT c FROM RentalContract c WHERE c.space.id = :spaceId")
+    List<RentalContract> findBySpaceId(@Param("spaceId") Long spaceId);
 
     List<RentalContract> findByStatus(RentalContract.ContractStatus status);
 

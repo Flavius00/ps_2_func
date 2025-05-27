@@ -1,7 +1,7 @@
 package com.example.demo.service;
 
-import com.example.demo.model.UserLogIn;
+import com.example.demo.model.User;
 
 public interface LoginService {
-    UserLogIn login(String username, String password);
+    User login(String username, String password);
 }

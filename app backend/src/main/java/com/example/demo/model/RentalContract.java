@@ -4,6 +4,8 @@ import lombok.*;
 import jakarta.persistence.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(name = "rental_contracts")
@@ -53,6 +55,43 @@ public class RentalContract {
 
     @Column(length = 1000)
     private String notes;
+
+    // Metode helper pentru a accesa informațiile space-ului fără a cauza loop
+    @JsonProperty("spaceId")
+    public Long getSpaceId() {
+        return space != null ? space.getId() : null;
+    }
+
+    @JsonProperty("spaceName")
+    public String getSpaceName() {
+        return space != null ? space.getName() : null;
+    }
+
+    @JsonProperty("spaceAddress")
+    public String getSpaceAddress() {
+        return space != null ? space.getAddress() : null;
+    }
+
+    @JsonProperty("spaceArea")
+    public Double getSpaceArea() {
+        return space != null ? space.getArea() : null;
+    }
+
+    // Metode helper pentru tenant
+    @JsonProperty("tenantId")
+    public Long getTenantId() {
+        return tenant != null ? tenant.getId() : null;
+    }
+
+    @JsonProperty("tenantName")
+    public String getTenantName() {
+        return tenant != null ? tenant.getName() : null;
+    }
+
+    @JsonProperty("tenantEmail")
+    public String getTenantEmail() {
+        return tenant != null ? tenant.getEmail() : null;
+    }
 
     public enum ContractStatus {
         ACTIVE,

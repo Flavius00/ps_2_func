@@ -4,6 +4,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import jakarta.persistence.*;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 @Entity
 @DiscriminatorValue("OWNER")
@@ -19,6 +20,7 @@ public class Owner extends User {
     private String taxId;
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference // Această parte va gestiona serializarea
     private List<ComercialSpace> spaces;
 
     // Constructor care setează automat rolul

@@ -32,6 +32,6 @@ public class Building {
     private Double longitude;
 
     @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference
+    @JsonManagedReference("building-spaces") // Numele trebuie să corespundă cu cel din ComercialSpace
     private List<ComercialSpace> spaces;
 }
