@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Edit Comercial Space</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-5">
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white text-center">
+            <h2>Edit Comercial Space</h2>
+        </div>
+        <div class="card-body">
+            <form th:action="@{/comercial-space/update}" th:object="${comercialSpace}" method="post">
+                <div class="mb-3">
+                    <label for="id" class="form-label">ID:</label>
+                    <input type="text" th:field="*{id}" id="id" class="form-control" readonly />
+                </div>
+                <div class="mb-3">
+                    <label for="location" class="form-label">Location:</label>
+                    <input type="text" th:field="*{location}" id="location" class="form-control"/>
+                </div>
+                <div class="mb-3">
+                    <label for="areaSquareMeters" class="form-label">Area (m²):</label>
+                    <input type="text" th:field="*{areaSquareMeters}" id="areaSquareMeters" class="form-control"/>
+                </div>
+                <div class="mb-3">
+                    <label for="type" class="form-label">Type:</label>
+                    <select th:field="*{type}" id="type" class="form-select">
+                        <option value="SHOP">Shop</option>
+                        <option value="OFFICE">Office</option>
+                        <option value="RESTAURANT">Restaurant</option>
+                        <option value="WAREHOUSE">Warehouse</option>
+                    </select>t
+                </div>
+                <div class="mb-3">
+                    <label for="parking.totalSpots" class="form-label">Parking Spots:</label>
+                    <input type="number" th:field="*{parking.totalSpots}" id="parking.totalSpots" class="form-control"/>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-success">Save</button>
+                    <a href="/comercial-space" class="btn btn-secondary">Back to List</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
