@@ -1,51 +1,34 @@
 package com.example.demo.repository;
 
 import com.example.demo.model.Building;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Repository
-public class BuildingRepository {
-    private final List<Building> buildings = new ArrayList<>();
+public interface BuildingRepository extends JpaRepository<Building, Long> {
 
-    public Building save(Building building) {
-        if (building.getId() == null) {
-            building.setId((long) (buildings.size() + 1));
-        }
+    List<Building> findByNameContaining(String name);
 
-        Building existingBuilding = findById(building.getId());
-        if (existingBuilding == null) {
-            buildings.add(building);
-        } else {
-            update(building);
-        }
-        return building;
-    }
+    List<Building> findByAddressContaining(String address);
 
-    public List<Building> findAll() {
-        return buildings;
-    }
+    List<Building> findByYearBuiltBetween(Integer startYear, Integer endYear);
 
-    public Building findById(Long id) {
-        return buildings.stream()
-                .filter(building -> building.getId().equals(id))
-                .findFirst()
-                .orElse(null);
-    }
+    List<Building> findByTotalFloorsGreaterThan(Integer minFloors);
 
-    public Building update(Building updatedBuilding) {
-        for (int i = 0; i < buildings.size(); i++) {
-            if (buildings.get(i).getId().equals(updatedBuilding.getId())) {
-                buildings.set(i, updatedBuilding);
-                return updatedBuilding;
-            }
-        }
-        return null;
-    }
+    @Query("SELECT b FROM Building b WHERE b.latitude BETWEEN :minLat AND :maxLat AND b.longitude BETWEEN :minLng AND :maxLng")
+    List<Building> findBuildingsInArea(@Param("minLat") Double minLat, @Param("maxLat") Double maxLat,
+                                       @Param("minLng") Double minLng, @Param("maxLng") Double maxLng);
 
-    public boolean deleteById(Long id) {
-        return buildings.removeIf(building -> building.getId().equals(id));
-    }
+    @Query("SELECT b FROM Building b JOIN b.spaces s WHERE s.available = true")
+    List<Building> findBuildingsWithAvailableSpaces();
+
+    @Query("SELECT COUNT(s) FROM Building b JOIN b.spaces s WHERE b.id = :buildingId")
+    long countSpacesByBuildingId(@Param("buildingId") Long buildingId);
+
+    @Query("SELECT COUNT(s) FROM Building b JOIN b.spaces s WHERE b.id = :buildingId AND s.available = true")
+    long countAvailableSpacesByBuildingId(@Param("buildingId") Long buildingId);
 }

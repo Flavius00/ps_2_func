@@ -9,4 +9,9 @@ public interface BuildingService {
     Building getBuildingById(Long id);
     Building updateBuilding(Building building);
     void deleteBuilding(Long id);
+
+    // Metode noi pentru JPA
+    List<Building> searchBuildings(String keyword);
+    List<Building> getBuildingsWithAvailableSpaces();
+    long getSpaceCountByBuildingId(Long buildingId);
 }

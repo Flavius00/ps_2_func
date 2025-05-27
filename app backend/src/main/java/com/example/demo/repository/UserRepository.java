@@ -1,63 +1,30 @@
 package com.example.demo.repository;
 
-import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.model.User;
-import lombok.Getter;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
-@Getter
-public class UserRepository {
-    private List<User> users = new ArrayList<>();
+public interface UserRepository extends JpaRepository<User, Long> {
 
-    public User save(User user) {
-        if (user == null) {
-            throw new IllegalArgumentException("The user cannot be null!");
-        }
-        users.add(user);
-        return user;
-    }
+    Optional<User> findByUsername(String username);
 
-    public void saveAll(List<User> newUsers) {
-        users.addAll(newUsers);
-    }
+    Optional<User> findByEmail(String email);
 
-    public List<User> findAll() {
-        return users;
-    }
+    List<User> findByRole(User.UserRole role);
 
-    public User findById(Long id) {
-        return users.stream()
-                .filter(user -> user.getId().equals(id))
-                .findFirst()
-                .orElse(null);
-    }
+    boolean existsByUsername(String username);
 
-    public User findByUsername(String username) {
-        return users.stream()
-                .filter(user -> user.getUsername().equals(username))
-                .findFirst()
-                .orElse(null);
-    }
+    boolean existsByEmail(String email);
 
-    public User update(User user) {
-        User oldUser = findById(user.getId());
+    @Query("SELECT u FROM User u WHERE u.name LIKE %:name%")
+    List<User> findByNameContaining(@Param("name") String name);
 
-        if (oldUser == null) {
-            throw new ResourceNotFoundException("User with the following id not found: " + user.getId());
-        }
-
-        oldUser.setName(user.getName());
-        oldUser.setUsername(user.getUsername());
-        oldUser.setPassword(user.getPassword());
-        oldUser.setRole(user.getRole());
-        return oldUser;
-    }
-
-    public void deleteById(Long id) {
-        users.removeIf(user -> user.getId().equals(id));
-    }
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role")
+    long countByRole(@Param("role") User.UserRole role);
 }

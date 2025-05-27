@@ -1,93 +1,47 @@
 package com.example.demo.repository;
 
 import com.example.demo.model.ComercialSpace;
-import org.springframework.stereotype.Component;
-import java.util.ArrayList;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
 import java.util.List;
 
-@Component
-public class ComercialSpaceRepository {
-    private final List<ComercialSpace> spaces = new ArrayList<>();
+@Repository
+public interface ComercialSpaceRepository extends JpaRepository<ComercialSpace, Long> {
 
-    public ComercialSpace save(ComercialSpace space) {
-        ComercialSpace existingSpace = findById(space.getId());
-        if (existingSpace == null) {
-            spaces.add(space);
-        } else {
-            // Update existing space properties
-            existingSpace.setName(space.getName());
-            existingSpace.setDescription(space.getDescription());
-            existingSpace.setArea(space.getArea());
-            existingSpace.setPricePerMonth(space.getPricePerMonth());
-            existingSpace.setAddress(space.getAddress());
-            existingSpace.setLatitude(space.getLatitude());
-            existingSpace.setLongitude(space.getLongitude());
-            existingSpace.setAmenities(space.getAmenities());
-            existingSpace.setAvailable(space.getAvailable());
-            existingSpace.setOwner(space.getOwner());
-            existingSpace.setBuilding(space.getBuilding());
-            existingSpace.setParking(space.getParking());
-            existingSpace.setSpaceType(space.getSpaceType());
+    List<ComercialSpace> findByAvailable(Boolean available);
 
-            // Space type specific properties
-            existingSpace.setFloors(space.getFloors());
-            existingSpace.setNumberOfRooms(space.getNumberOfRooms());
-            existingSpace.setHasReception(space.getHasReception());
-            existingSpace.setShopWindowSize(space.getShopWindowSize());
-            existingSpace.setHasCustomerEntrance(space.getHasCustomerEntrance());
-            existingSpace.setMaxOccupancy(space.getMaxOccupancy());
-            existingSpace.setCeilingHeight(space.getCeilingHeight());
-            existingSpace.setHasLoadingDock(space.getHasLoadingDock());
-            existingSpace.setSecurityLevel(space.getSecurityLevel());
-        }
-        return space;
-    }
+    List<ComercialSpace> findBySpaceType(ComercialSpace.SpaceType spaceType);
 
-    public List<ComercialSpace> findAll() {
-        return spaces;
-    }
+    List<ComercialSpace> findByOwnerId(Long ownerId);
 
-    public ComercialSpace findById(Long id) {
-        return spaces.stream()
-                .filter(space -> space.getId().equals(id))
-                .findFirst()
-                .orElse(null);
-    }
+    List<ComercialSpace> findByBuildingId(Long buildingId);
 
-    public ComercialSpace update(ComercialSpace updatedSpace) {
-        ComercialSpace existingSpace = findById(updatedSpace.getId());
-        if (existingSpace != null) {
-            existingSpace.setName(updatedSpace.getName());
-            existingSpace.setDescription(updatedSpace.getDescription());
-            existingSpace.setArea(updatedSpace.getArea());
-            existingSpace.setPricePerMonth(updatedSpace.getPricePerMonth());
-            existingSpace.setAddress(updatedSpace.getAddress());
-            existingSpace.setLatitude(updatedSpace.getLatitude());
-            existingSpace.setLongitude(updatedSpace.getLongitude());
-            existingSpace.setAmenities(updatedSpace.getAmenities());
-            existingSpace.setAvailable(updatedSpace.getAvailable());
-            existingSpace.setOwner(updatedSpace.getOwner());
-            existingSpace.setBuilding(updatedSpace.getBuilding());
-            existingSpace.setParking(updatedSpace.getParking());
-            existingSpace.setSpaceType(updatedSpace.getSpaceType());
+    List<ComercialSpace> findByPricePerMonthBetween(Double minPrice, Double maxPrice);
 
-            // Space type specific properties
-            existingSpace.setFloors(updatedSpace.getFloors());
-            existingSpace.setNumberOfRooms(updatedSpace.getNumberOfRooms());
-            existingSpace.setHasReception(updatedSpace.getHasReception());
-            existingSpace.setShopWindowSize(updatedSpace.getShopWindowSize());
-            existingSpace.setHasCustomerEntrance(updatedSpace.getHasCustomerEntrance());
-            existingSpace.setMaxOccupancy(updatedSpace.getMaxOccupancy());
-            existingSpace.setCeilingHeight(updatedSpace.getCeilingHeight());
-            existingSpace.setHasLoadingDock(updatedSpace.getHasLoadingDock());
-            existingSpace.setSecurityLevel(updatedSpace.getSecurityLevel());
+    List<ComercialSpace> findByAreaBetween(Double minArea, Double maxArea);
 
-            return existingSpace;
-        }
-        return null;
-    }
+    @Query("SELECT s FROM ComercialSpace s WHERE s.available = true AND s.spaceType = :spaceType")
+    List<ComercialSpace> findAvailableBySpaceType(@Param("spaceType") ComercialSpace.SpaceType spaceType);
 
-    public boolean deleteById(Long id) {
-        return spaces.removeIf(space -> space.getId().equals(id));
-    }
+    @Query("SELECT s FROM ComercialSpace s WHERE s.available = true AND s.pricePerMonth <= :maxPrice")
+    List<ComercialSpace> findAvailableWithinBudget(@Param("maxPrice") Double maxPrice);
+
+    @Query("SELECT s FROM ComercialSpace s WHERE s.name LIKE %:keyword% OR s.description LIKE %:keyword%")
+    List<ComercialSpace> searchByKeyword(@Param("keyword") String keyword);
+
+    @Query("SELECT s FROM ComercialSpace s WHERE s.latitude BETWEEN :minLat AND :maxLat AND s.longitude BETWEEN :minLng AND :maxLng")
+    List<ComercialSpace> findSpacesInArea(@Param("minLat") Double minLat, @Param("maxLat") Double maxLat,
+                                          @Param("minLng") Double minLng, @Param("maxLng") Double maxLng);
+
+    @Query("SELECT COUNT(s) FROM ComercialSpace s WHERE s.available = true")
+    long countAvailableSpaces();
+
+    @Query("SELECT s.spaceType, COUNT(s) FROM ComercialSpace s GROUP BY s.spaceType")
+    List<Object[]> countSpacesByType();
+
+    @Query("SELECT AVG(s.pricePerMonth) FROM ComercialSpace s WHERE s.spaceType = :spaceType")
+    Double getAveragePriceBySpaceType(@Param("spaceType") ComercialSpace.SpaceType spaceType);
 }

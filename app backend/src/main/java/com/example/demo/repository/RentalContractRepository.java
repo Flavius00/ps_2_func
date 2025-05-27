@@ -1,62 +1,50 @@
 package com.example.demo.repository;
 
 import com.example.demo.model.RentalContract;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
-public class RentalContractRepository {
-    private final List<RentalContract> contracts = new ArrayList<>();
+public interface RentalContractRepository extends JpaRepository<RentalContract, Long> {
 
-    public RentalContract save(RentalContract contract) {
-        if (contract.getId() == null) {
-            contract.setId((long) (contracts.size() + 1));
-        }
+    List<RentalContract> findByTenantId(Long tenantId);
 
-        RentalContract existingContract = findById(contract.getId());
-        if (existingContract == null) {
-            contracts.add(contract);
-        } else {
-            // Update existing contract
-            update(contract);
-        }
-        return contract;
-    }
+    List<RentalContract> findBySpaceId(Long spaceId);
 
-    public List<RentalContract> findAll() {
-        return contracts;
-    }
+    List<RentalContract> findByStatus(RentalContract.ContractStatus status);
 
-    public RentalContract findById(Long id) {
-        return contracts.stream()
-                .filter(contract -> contract.getId().equals(id))
-                .findFirst()
-                .orElse(null);
-    }
+    Optional<RentalContract> findByContractNumber(String contractNumber);
 
-    public RentalContract update(RentalContract updatedContract) {
-        for (int i = 0; i < contracts.size(); i++) {
-            if (contracts.get(i).getId().equals(updatedContract.getId())) {
-                contracts.set(i, updatedContract);
-                return updatedContract;
-            }
-        }
-        return null;
-    }
+    List<RentalContract> findByStartDateBetween(LocalDate startDate, LocalDate endDate);
 
-    public ArrayList<RentalContract> findByUserId(Long userId) {
-        ArrayList<RentalContract> contracts = new ArrayList<>();
-        for (RentalContract contract : this.contracts) {
-            if(contract.getTenant().getId().equals(userId)) {
-                contracts.add(contract);
-            }
-        }
-        return contracts;
-    }
+    List<RentalContract> findByEndDateBetween(LocalDate startDate, LocalDate endDate);
 
-    public boolean deleteById(Long id) {
-        return contracts.removeIf(contract -> contract.getId().equals(id));
-    }
+    List<RentalContract> findByIsPaid(Boolean isPaid);
+
+    @Query("SELECT c FROM RentalContract c WHERE c.space.owner.id = :ownerId")
+    List<RentalContract> findByOwnerId(@Param("ownerId") Long ownerId);
+
+    @Query("SELECT c FROM RentalContract c WHERE c.endDate < :currentDate AND c.status = 'ACTIVE'")
+    List<RentalContract> findExpiredContracts(@Param("currentDate") LocalDate currentDate);
+
+    @Query("SELECT c FROM RentalContract c WHERE c.endDate BETWEEN :startDate AND :endDate AND c.status = 'ACTIVE'")
+    List<RentalContract> findContractsExpiringBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT COUNT(c) FROM RentalContract c WHERE c.status = :status")
+    long countByStatus(@Param("status") RentalContract.ContractStatus status);
+
+    @Query("SELECT SUM(c.monthlyRent) FROM RentalContract c WHERE c.status = 'ACTIVE'")
+    Double getTotalActiveMonthlyRevenue();
+
+    @Query("SELECT c FROM RentalContract c WHERE c.tenant.id = :tenantId AND c.status = 'ACTIVE'")
+    List<RentalContract> findActiveContractsByTenantId(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT c FROM RentalContract c WHERE c.space.owner.id = :ownerId AND c.status = 'ACTIVE'")
+    List<RentalContract> findActiveContractsByOwnerId(@Param("ownerId") Long ownerId);
 }
