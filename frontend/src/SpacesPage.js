@@ -33,13 +33,11 @@ function SpacesPage() {
             // Curăță URL-ul pentru a evita afișarea mesajului după reîncărcare
             window.history.replaceState({}, document.title);
 
-            // Setează un timer pentru a ascunde mesajul după 5 secunde
             setTimeout(() => {
                 setSuccessMessage('');
             }, 5000);
         }
 
-        // Verifică dacă există un filtru de clădire în starea locației
         if (location.state?.buildingFilter) {
             setBuildingFilter(location.state.buildingFilter);
         }
@@ -105,19 +103,16 @@ function SpacesPage() {
     const handleFilter = () => {
         let filtered = spaces;
 
-        // Aplicare filtru pentru clădire dacă există
         if (buildingFilter) {
             filtered = filtered.filter(space =>
                 space.building && space.building.id === buildingFilter
             );
         }
 
-        // Pentru proprietari, arată doar spațiile lor
         if (user?.role === 'OWNER') {
             filtered = filtered.filter(space => space.owner && space.owner.id === user.id);
         }
 
-        // Aplică celelalte filtre
         filtered = filtered.filter(space => {
             const price = space.pricePerMonth;
             const area = space.area;
@@ -133,7 +128,6 @@ function SpacesPage() {
             return matchesPrice && matchesArea && matchesLocation && matchesType && matchesAvailability;
         });
 
-        // Aplică sortarea
         if (sortOption === 'priceAsc') {
             filtered.sort((a, b) => a.pricePerMonth - b.pricePerMonth);
         } else if (sortOption === 'priceDesc') {

@@ -30,17 +30,14 @@ function ConfirmContractPage() {
     const handleDownloadContract = () => {
         console.log(contract.paymentMethod);
         try {
-            // Folosim jsPDF importat la începutul fișierului
             const doc = new jsPDF();
 
-            // Adăugarea antetului
             doc.setFontSize(20);
             doc.setTextColor(0, 51, 102);
             doc.text("CONTRACT DE ÎNCHIRIERE", 105, 15, { align: "center" });
             doc.setFontSize(14);
             doc.text("Nr. " + contract.contractNumber, 105, 25, { align: "center" });
 
-            // Adăugarea informațiilor despre spațiu
             doc.setFontSize(12);
             doc.setTextColor(0, 0, 0);
             doc.text("DETALII SPAȚIU ÎNCHIRIAT:", 20, 40);
@@ -66,7 +63,6 @@ function ConfirmContractPage() {
 
             doc.text("Metodă de Plată: " + paymentMethodText, 25, 108);
 
-            // Adăugarea secțiunii pentru semnături
             doc.setFontSize(12);
             doc.text("SEMNĂTURI:", 20, 125);
 
@@ -74,14 +70,12 @@ function ConfirmContractPage() {
             doc.text("Proprietar: ______________________", 25, 140);
             doc.text("Chiriaș: ________________________", 25, 150);
 
-            // Adăugarea datei și a notelor de subsol
             const currentDate = new Date().toLocaleDateString('ro-RO');
             doc.text("Document generat la data: " + currentDate, 20, 180);
 
             doc.setFontSize(8);
             doc.text("Acest document reprezintă o confirmare a contractului de închiriere. Pentru informații suplimentare, contactați support@spatii-comerciale.ro.", 20, 270);
 
-            // Descărcarea PDF-ului
             doc.save("Contract_" + contract.contractNumber + ".pdf");
 
         } catch (error) {

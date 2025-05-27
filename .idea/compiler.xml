@@ -8,16 +8,18 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="app backend" />
+        <module name="project-TaniaPantea" />
+        <module name="project-TaniaPantea (1)" />
+        <module name="project-TaniaPantea (2)" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="project-TaniaPantea (1)" target="17" />
-    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="app backend" options="-parameters" />
+      <module name="project-TaniaPantea" options="-parameters" />
       <module name="project-TaniaPantea (1)" options="-parameters" />
+      <module name="project-TaniaPantea (2)" options="-parameters" />
     </option>
   </component>
 </project>

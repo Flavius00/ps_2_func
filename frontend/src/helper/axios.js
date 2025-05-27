@@ -29,7 +29,6 @@ export const getAxiosInstance = (endpoint) => {
     return mainInstance;
 };
 
-// Interceptori pentru a adăuga tokenul de autentificare la cereri (pentru implementare viitoare)
 mainInstance.interceptors.request.use(
     request => {
         const authToken = localStorage.getItem("authToken");
