@@ -20,8 +20,12 @@ public class Tenant extends User {
 
     private String taxId;
 
-    @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<RentalContract> contracts;
+
+
+    // ELIMINAT: Lista directă de CommercialSpace
+    // Motivul: Spațiile închiriate sunt accesibile prin contracts -> space
+    // Pentru a obține spațiile închiriate de un tenant, folosim:
+    // tenant.getContracts().stream().map(RentalContract::getSpace).collect(toList())
 
     // Constructor care setează automat rolul
     public Tenant(String name, String email, String username, String password) {

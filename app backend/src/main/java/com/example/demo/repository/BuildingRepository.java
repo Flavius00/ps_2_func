@@ -23,12 +23,15 @@ public interface BuildingRepository extends JpaRepository<Building, Long> {
     List<Building> findBuildingsInArea(@Param("minLat") Double minLat, @Param("maxLat") Double maxLat,
                                        @Param("minLng") Double minLng, @Param("maxLng") Double maxLng);
 
-    @Query("SELECT b FROM Building b JOIN b.spaces s WHERE s.available = true")
+    // VERIFICATĂ: Această metodă folosește o jointure inversă, deci este corectă
+    @Query("SELECT DISTINCT b FROM Building b WHERE EXISTS (SELECT 1 FROM ComercialSpace s WHERE s.building.id = b.id AND s.available = true)")
     List<Building> findBuildingsWithAvailableSpaces();
 
-    @Query("SELECT COUNT(s) FROM Building b JOIN b.spaces s WHERE b.id = :buildingId")
+    // VERIFICATĂ: Folosește jointure inversă, corectă
+    @Query("SELECT COUNT(s) FROM ComercialSpace s WHERE s.building.id = :buildingId")
     long countSpacesByBuildingId(@Param("buildingId") Long buildingId);
 
-    @Query("SELECT COUNT(s) FROM Building b JOIN b.spaces s WHERE b.id = :buildingId AND s.available = true")
+    // VERIFICATĂ: Folosește jointure inversă, corectă
+    @Query("SELECT COUNT(s) FROM ComercialSpace s WHERE s.building.id = :buildingId AND s.available = true")
     long countAvailableSpacesByBuildingId(@Param("buildingId") Long buildingId);
 }

@@ -15,11 +15,10 @@ public interface ComercialSpaceRepository extends JpaRepository<ComercialSpace, 
 
     List<ComercialSpace> findBySpaceType(ComercialSpace.SpaceType spaceType);
 
-    // Schimbat de la findByOwnerId la owner.id pentru a referi corect relația
+    // Aceste metode sunt corecte - folosesc relațiile ManyToOne existente
     @Query("SELECT cs FROM ComercialSpace cs WHERE cs.owner.id = :ownerId")
     List<ComercialSpace> findByOwnerId(@Param("ownerId") Long ownerId);
 
-    // Schimbat de la findByBuildingId la building.id pentru a referi corect relația
     @Query("SELECT cs FROM ComercialSpace cs WHERE cs.building.id = :buildingId")
     List<ComercialSpace> findByBuildingId(@Param("buildingId") Long buildingId);
 
@@ -48,4 +47,12 @@ public interface ComercialSpaceRepository extends JpaRepository<ComercialSpace, 
 
     @Query("SELECT AVG(s.pricePerMonth) FROM ComercialSpace s WHERE s.spaceType = :spaceType")
     Double getAveragePriceBySpaceType(@Param("spaceType") ComercialSpace.SpaceType spaceType);
+
+    // ADĂUGATĂ: Metodă pentru a număra spațiile unui owner (alternativă la cea din OwnerRepository)
+    @Query("SELECT COUNT(cs) FROM ComercialSpace cs WHERE cs.owner.id = :ownerId")
+    long countByOwnerId(@Param("ownerId") Long ownerId);
+
+    // ADĂUGATĂ: Metodă pentru spațiile disponibile ale unui owner
+    @Query("SELECT cs FROM ComercialSpace cs WHERE cs.owner.id = :ownerId AND cs.available = true")
+    List<ComercialSpace> findAvailableSpacesByOwnerId(@Param("ownerId") Long ownerId);
 }

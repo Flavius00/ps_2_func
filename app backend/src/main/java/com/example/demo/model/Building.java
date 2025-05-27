@@ -3,7 +3,6 @@ package com.example.demo.model;
 import lombok.*;
 import jakarta.persistence.*;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 @Entity
 @Table(name = "buildings")
@@ -31,7 +30,8 @@ public class Building {
 
     private Double longitude;
 
+    // ELIMINAT @JsonManagedReference - nu mai avem nevoie de adnotări JSON circulare
+    // Relația este păstrată pentru integritatea referențială, dar nu va fi serializată automat
     @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference("building-spaces") // Numele trebuie să corespundă cu cel din ComercialSpace
     private List<ComercialSpace> spaces;
 }

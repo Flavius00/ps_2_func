@@ -3,7 +3,6 @@ package com.example.demo.model;
 import lombok.*;
 import jakarta.persistence.*;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
@@ -44,14 +43,14 @@ public class ComercialSpace {
     @Column(nullable = false)
     private Boolean available = true;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    // Relația cu Owner - doar referința către owner, fără @JsonManagedReference
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
-    @JsonBackReference // Această parte nu va fi serializată pentru a evita loop-ul
     private Owner owner;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    // Relația cu Building - doar referința către building
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "building_id")
-    @JsonBackReference("building-spaces") // Folosim un nume specific pentru această relație
     private Building building;
 
     // Cascadă pentru parking - salvează automat parking-ul când salvează space-ul
@@ -80,6 +79,7 @@ public class ComercialSpace {
     @Enumerated(EnumType.STRING)
     private SecurityLevel securityLevel;
 
+    // Relația cu contractele - un spațiu poate avea multiple contracte de-a lungul timpului
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<RentalContract> contracts;
 

@@ -18,10 +18,12 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
 
     List<Tenant> findByCompanyNameContaining(String companyName);
 
-    @Query("SELECT t FROM Tenant t JOIN t.contracts c WHERE c.status = 'ACTIVE'")
+    // CORECTATĂ: Nu mai folosim t.contracts, ci folosim o jointure inversă cu RentalContract
+    @Query("SELECT DISTINCT t FROM Tenant t WHERE EXISTS (SELECT 1 FROM RentalContract c WHERE c.tenant.id = t.id AND c.status = 'ACTIVE')")
     List<Tenant> findTenantsWithActiveContracts();
 
-    @Query("SELECT COUNT(c) FROM Tenant t JOIN t.contracts c WHERE t.id = :tenantId")
+    // CORECTATĂ: Folosim jointure inversă pentru a număra contractele
+    @Query("SELECT COUNT(c) FROM RentalContract c WHERE c.tenant.id = :tenantId")
     long countContractsByTenantId(@Param("tenantId") Long tenantId);
 
     @Query("SELECT DISTINCT t.businessType FROM Tenant t WHERE t.businessType IS NOT NULL")

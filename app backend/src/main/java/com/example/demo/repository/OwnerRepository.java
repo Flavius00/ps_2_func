@@ -16,12 +16,15 @@ public interface OwnerRepository extends JpaRepository<Owner, Long> {
 
     List<Owner> findByCompanyNameContaining(String companyName);
 
-    @Query("SELECT o FROM Owner o JOIN o.spaces s WHERE s.available = true")
+    @Query("SELECT o FROM Owner o WHERE EXISTS (SELECT 1 FROM ComercialSpace s WHERE s.owner.id = o.id AND s.available = true)")
     List<Owner> findOwnersWithAvailableSpaces();
 
-    @Query("SELECT COUNT(s) FROM Owner o JOIN o.spaces s WHERE o.id = :ownerId")
+    // CORECTATĂ: Query-ul nu mai folosește o.spaces care nu mai există
+    // În schimb, folosim o jointure inversă cu ComercialSpace
+    @Query("SELECT COUNT(s) FROM ComercialSpace s WHERE s.owner.id = :ownerId")
     long countSpacesByOwnerId(@Param("ownerId") Long ownerId);
 
-    @Query("SELECT o FROM Owner o WHERE SIZE(o.spaces) > :minSpaces")
+    // CORECTATĂ: Și această metodă pentru consistență
+    @Query("SELECT o FROM Owner o WHERE (SELECT COUNT(s) FROM ComercialSpace s WHERE s.owner.id = o.id) > :minSpaces")
     List<Owner> findOwnersWithMinimumSpaces(@Param("minSpaces") int minSpaces);
 }
