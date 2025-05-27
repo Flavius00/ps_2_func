@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.model.Building;
+import com.example.demo.model.ComercialSpace;
 import java.util.List;
 
 public interface BuildingService {
@@ -10,8 +11,13 @@ public interface BuildingService {
     Building updateBuilding(Building building);
     void deleteBuilding(Long id);
 
-    // Metode noi pentru JPA
+    // Metode pentru gestionarea spațiilor unei clădiri
     List<Building> searchBuildings(String keyword);
     List<Building> getBuildingsWithAvailableSpaces();
     long getSpaceCountByBuildingId(Long buildingId);
+
+    // ADĂUGATE: Metode pentru obținerea spațiilor unei clădiri
+    List<ComercialSpace> getBuildingSpaces(Long buildingId);
+    List<ComercialSpace> getBuildingAvailableSpaces(Long buildingId);
+    long getBuildingAvailableSpacesCount(Long buildingId);
 }

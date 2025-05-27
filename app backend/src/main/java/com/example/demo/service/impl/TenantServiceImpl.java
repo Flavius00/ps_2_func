@@ -58,12 +58,22 @@ public class TenantServiceImpl implements TenantService {
         if (!tenantRepository.existsById(id)) {
             throw new ResourceNotFoundException("Tenant not found with id: " + id);
         }
+
+        // Verifică dacă tenant-ul are contracte active
+        long activeContractsCount = contractRepository.findActiveContractsByTenantId(id).size();
+        if (activeContractsCount > 0) {
+            throw new IllegalStateException("Cannot delete tenant with active contracts. " +
+                    "Please terminate all contracts first.");
+        }
+
         tenantRepository.deleteById(id);
     }
 
     // Metodele pentru managementul contractelor și spațiilor
     /**
      * Obține toate spațiile închiriate de un tenant prin contractele active
+     * NOTA: Nu mai folosim tenant.getRentedSpaces() deoarece nu există asemenea listă în Tenant
+     * În schimb, obținem spațiile prin contractele active
      */
     @Override
     @Transactional(readOnly = true)

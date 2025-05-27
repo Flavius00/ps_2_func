@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -57,12 +56,22 @@ public class OwnerServiceImpl implements OwnerService {
         if (!ownerRepository.existsById(id)) {
             throw new ResourceNotFoundException("Owner not found with id: " + id);
         }
+
+        // Verifică dacă proprietarul are spații comerciale asociate
+        long spacesCount = spaceRepository.countByOwnerId(id);
+        if (spacesCount > 0) {
+            throw new IllegalStateException("Cannot delete owner with associated commercial spaces. " +
+                    "Please remove all spaces first.");
+        }
+
         ownerRepository.deleteById(id);
     }
 
     // Metodele pentru managementul spațiilor
     /**
      * Obține toate spațiile comerciale ale unui proprietar
+     * NOTA: Nu mai folosim owner.getSpaces() deoarece am eliminat lista din Owner
+     * În schimb, folosim query invers prin ComercialSpaceRepository
      */
     @Override
     @Transactional(readOnly = true)
@@ -90,6 +99,7 @@ public class OwnerServiceImpl implements OwnerService {
 
     /**
      * Obține veniturile totale lunare ale unui proprietar din spațiile închiriate
+     * NOTA: Calculăm pe baza spațiilor obținute prin query, nu prin owner.getSpaces()
      */
     @Override
     @Transactional(readOnly = true)

@@ -22,6 +22,10 @@ public interface ComercialSpaceRepository extends JpaRepository<ComercialSpace, 
     @Query("SELECT cs FROM ComercialSpace cs WHERE cs.building.id = :buildingId")
     List<ComercialSpace> findByBuildingId(@Param("buildingId") Long buildingId);
 
+    // ADĂUGATĂ: Metodă pentru spațiile disponibile ale unei clădiri
+    @Query("SELECT cs FROM ComercialSpace cs WHERE cs.building.id = :buildingId AND cs.available = :available")
+    List<ComercialSpace> findByBuildingIdAndAvailable(@Param("buildingId") Long buildingId, @Param("available") Boolean available);
+
     List<ComercialSpace> findByPricePerMonthBetween(Double minPrice, Double maxPrice);
 
     List<ComercialSpace> findByAreaBetween(Double minArea, Double maxArea);
@@ -48,11 +52,15 @@ public interface ComercialSpaceRepository extends JpaRepository<ComercialSpace, 
     @Query("SELECT AVG(s.pricePerMonth) FROM ComercialSpace s WHERE s.spaceType = :spaceType")
     Double getAveragePriceBySpaceType(@Param("spaceType") ComercialSpace.SpaceType spaceType);
 
-    // ADĂUGATĂ: Metodă pentru a număra spațiile unui owner (alternativă la cea din OwnerRepository)
+    // Metodă pentru a număra spațiile unui owner
     @Query("SELECT COUNT(cs) FROM ComercialSpace cs WHERE cs.owner.id = :ownerId")
     long countByOwnerId(@Param("ownerId") Long ownerId);
 
-    // ADĂUGATĂ: Metodă pentru spațiile disponibile ale unui owner
+    // Metodă pentru spațiile disponibile ale unui owner
     @Query("SELECT cs FROM ComercialSpace cs WHERE cs.owner.id = :ownerId AND cs.available = true")
     List<ComercialSpace> findAvailableSpacesByOwnerId(@Param("ownerId") Long ownerId);
+
+    // ADĂUGATĂ: Metodă pentru a număra spațiile unei clădiri
+    @Query("SELECT COUNT(cs) FROM ComercialSpace cs WHERE cs.building.id = :buildingId")
+    long countByBuildingId(@Param("buildingId") Long buildingId);
 }

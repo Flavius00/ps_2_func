@@ -16,7 +16,7 @@ function SpacesPage() {
     const [maxArea, setMaxArea] = useState('');
     const [locations, setLocations] = useState([]);
     const [spaceTypes, setSpaceTypes] = useState([]);
-    const [onlyAvailable, setOnlyAvailable] = useState(true);
+    const [onlyAvailable, setOnlyAvailable] = useState(false); // Schimbat: pentru OWNER să vadă toate spațiile
     const [sortOption, setSortOption] = useState('');
     const [buildingFilter, setBuildingFilter] = useState(null);
 
@@ -26,6 +26,8 @@ function SpacesPage() {
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user'));
         setUser(storedUser);
+
+        console.log('Current user:', storedUser); // DEBUG
 
         // Verifică dacă există un mesaj de succes în starea locației
         if (location.state?.message) {
@@ -47,40 +49,55 @@ function SpacesPage() {
             try {
                 const response = await axios.get('http://localhost:8080/spaces/getAll');
 
+                // VERIFICARE CRITICĂ: Asigură-te că response.data este un array
+                const spacesData = Array.isArray(response.data) ? response.data : [];
+                console.log('Date primite de la server:', spacesData);
+                console.log('Număr de spații primite:', spacesData.length);
+
+                // Log pentru debugging - vezi ce spații au owner-ul setat
+                spacesData.forEach(space => {
+                    console.log(`Space ID: ${space.id}, Name: ${space.name}, Owner ID: ${space.ownerId}, Owner Name: ${space.ownerName}`);
+                });
+
                 // Dacă un spațiu nou a fost adăugat, îl includem în listă
                 if (location.state?.newSpace) {
-                    const existingSpace = response.data.find(s => s.id === location.state.newSpace.id);
+                    const existingSpace = spacesData.find(s => s.id === location.state.newSpace.id);
                     if (!existingSpace) {
-                        response.data.push(location.state.newSpace);
+                        spacesData.push(location.state.newSpace);
                     }
                 }
-                console.log('Date primite de la server:', response.data);
-                console.log('Număr de spații primite:', response.data.length);
 
-                // Restul codului de filtrare
-
-
-                setSpaces(response.data);
+                setSpaces(spacesData);
 
                 // Filtrare inițială
-                let initialFiltered = response.data;
+                let initialFiltered = [...spacesData]; // Copiază array-ul
 
                 // Aplicare filtru pentru clădire dacă există
                 if (location.state?.buildingFilter) {
                     initialFiltered = initialFiltered.filter(space =>
-                        space.building && space.building.id === location.state.buildingFilter
+                        space.buildingId && space.buildingId === location.state.buildingFilter
                     );
                 }
 
+                // CORECTARE CRITICĂ: Filtrare pe baza rolului utilizatorului
                 if (storedUser?.role === 'OWNER') {
-                    initialFiltered = initialFiltered.filter(space =>
-                        space.owner && space.owner.id === storedUser.id
-                    );
+                    console.log('Filtering for OWNER with ID:', storedUser.id); // DEBUG
+
+                    // Filtrează spațiile care aparțin owner-ului curent
+                    initialFiltered = initialFiltered.filter(space => {
+                        const isOwner = space.ownerId && space.ownerId === storedUser.id;
+                        console.log(`Space ${space.name}: ownerId=${space.ownerId}, user.id=${storedUser.id}, isOwner=${isOwner}`); // DEBUG
+                        return isOwner;
+                    });
+
+                    console.log('Spaces after owner filter:', initialFiltered.length); // DEBUG
                 }
                 else if (storedUser?.role === 'TENANT') {
+                    // Pentru tenant, afișează doar spațiile disponibile
                     initialFiltered = initialFiltered.filter(space => space.available);
+                    // Setează filtrul pentru spații disponibile implicit pentru tenants
+                    setOnlyAvailable(true);
                 }
-
 
                 console.log('Date după filtrarea inițială:', initialFiltered);
                 console.log('Număr de spații după filtrare:', initialFiltered.length);
@@ -88,6 +105,9 @@ function SpacesPage() {
                 setFilteredSpaces(initialFiltered);
             } catch (error) {
                 console.error('Error fetching spaces:', error);
+                // În caz de eroare, setează arrays goale pentru a evita crash-ul
+                setSpaces([]);
+                setFilteredSpaces([]);
             } finally {
                 setIsLoading(false);
             }
@@ -101,22 +121,30 @@ function SpacesPage() {
     };
 
     const handleFilter = () => {
-        let filtered = spaces;
+        // VERIFICARE CRITICĂ: Asigură-te că spaces este un array
+        if (!Array.isArray(spaces)) {
+            console.error('Spaces is not an array:', spaces);
+            setFilteredSpaces([]);
+            return;
+        }
+
+        let filtered = [...spaces]; // Copiază array-ul
 
         if (buildingFilter) {
             filtered = filtered.filter(space =>
-                space.building && space.building.id === buildingFilter
+                space.buildingId && space.buildingId === buildingFilter
             );
         }
 
+        // CORECTARE CRITICĂ: Aplică filtrul de owner ÎNTOTDEAUNA pentru owner-i
         if (user?.role === 'OWNER') {
-            filtered = filtered.filter(space => space.owner && space.owner.id === user.id);
+            filtered = filtered.filter(space => space.ownerId && space.ownerId === user.id);
         }
 
         filtered = filtered.filter(space => {
             const price = space.pricePerMonth;
             const area = space.area;
-            const location = space.building?.name;
+            const location = space.buildingName;
             const type = space.spaceType;
 
             const matchesPrice = (!minPrice || price >= minPrice) && (!maxPrice || price <= maxPrice);
@@ -148,14 +176,28 @@ function SpacesPage() {
         setMaxArea('');
         setLocations([]);
         setSpaceTypes([]);
-        setOnlyAvailable(user?.role === 'TENANT');
+
+        // Pentru OWNER, nu seta onlyAvailable la true implicit
+        if (user?.role === 'TENANT') {
+            setOnlyAvailable(true);
+        } else {
+            setOnlyAvailable(false);
+        }
+
         setSortOption('');
         setBuildingFilter(null);
 
+        // VERIFICARE CRITICĂ: Asigură-te că spaces este un array
+        if (!Array.isArray(spaces)) {
+            console.error('Spaces is not an array during reset:', spaces);
+            setFilteredSpaces([]);
+            return;
+        }
+
         // Resetează la lista inițială bazată pe rolul utilizatorului
-        let resetFiltered = spaces;
+        let resetFiltered = [...spaces];
         if (user?.role === 'OWNER') {
-            resetFiltered = spaces.filter(space => space.owner && space.owner.id === user.id);
+            resetFiltered = spaces.filter(space => space.ownerId && space.ownerId === user.id);
         } else if (user?.role === 'TENANT') {
             resetFiltered = spaces.filter(space => space.available);
         }
@@ -170,12 +212,21 @@ function SpacesPage() {
         navigate('/spaces/create');
     };
 
-    const uniqueLocations = [...new Set(spaces.map(s => s.building?.name).filter(Boolean))];
+    // VERIFICARE CRITICĂ: Asigură-te că spaces este un array înainte de a folosi .map()
+    const uniqueLocations = Array.isArray(spaces)
+        ? [...new Set(spaces
+            .filter(s => user?.role !== 'OWNER' || (s.ownerId === user.id)) // Filtrează și aici pentru owner
+            .map(s => s.buildingName)
+            .filter(Boolean))]
+        : [];
     const spaceTypeOptions = ['OFFICE', 'RETAIL', 'WAREHOUSE'];
 
     if (isLoading) {
         return <div className="loading-container">Se încarcă spațiile comerciale...</div>;
     }
+
+    // VERIFICARE CRITICĂ: Asigură-te că filteredSpaces este un array
+    const spacesToRender = Array.isArray(filteredSpaces) ? filteredSpaces : [];
 
     return (
         <div className="spaces-container">
@@ -187,7 +238,14 @@ function SpacesPage() {
             )}
 
             <div className="spaces-header">
-                <h2>Spații Comerciale</h2>
+                <h2>
+                    Spații Comerciale
+                    {user?.role === 'OWNER' && (
+                        <span style={{fontSize: '16px', color: '#7f8c8d', marginLeft: '10px'}}>
+                            (Spațiile mele)
+                        </span>
+                    )}
+                </h2>
                 {user?.role === 'OWNER' && (
                     <button className="btn btn-create" onClick={handleCreateSpace}>
                         + Adaugă Spațiu Nou
@@ -249,15 +307,18 @@ function SpacesPage() {
                         <option value="areaDesc">Suprafață: Mare la Mic</option>
                     </select>
                 </div>
-                <div className="filter-group checkbox-group">
-                    <label>
-                        <input
-                            type="checkbox"
-                            checked={onlyAvailable}
-                            onChange={(e) => setOnlyAvailable(e.target.checked)}
-                        /> Arată doar spații disponibile
-                    </label>
-                </div>
+                {/* Afișează filtrul de disponibilitate doar pentru tenants sau admins */}
+                {user?.role !== 'OWNER' && (
+                    <div className="filter-group checkbox-group">
+                        <label>
+                            <input
+                                type="checkbox"
+                                checked={onlyAvailable}
+                                onChange={(e) => setOnlyAvailable(e.target.checked)}
+                            /> Arată doar spații disponibile
+                        </label>
+                    </div>
+                )}
 
                 <div className="filter-expanded">
                     <div className="filter-section-inner">
@@ -315,11 +376,16 @@ function SpacesPage() {
                 </div>
             </div>
 
-            {filteredSpaces.length === 0 ? (
-                <p className="no-spaces-message">Nu s-au găsit spații care să corespundă criteriilor de căutare.</p>
+            {spacesToRender.length === 0 ? (
+                <div className="no-spaces-message">
+                    {user?.role === 'OWNER'
+                        ? "Nu aveți încă spații comerciale. Folosiți butonul 'Adaugă Spațiu Nou' pentru a adăuga primul spațiu."
+                        : "Nu s-au găsit spații care să corespundă criteriilor de căutare."
+                    }
+                </div>
             ) : (
                 <div className="spaces-grid">
-                    {filteredSpaces.map((space) => (
+                    {spacesToRender.map((space) => (
                         <div key={space.id} className="space-card">
                             <div className="space-card-header">
                                 <h3>{space.name}</h3>
@@ -343,7 +409,7 @@ function SpacesPage() {
                                     </div>
                                     <div className="detail-item">
                                         <span className="detail-label">Locație:</span>
-                                        <span className="detail-value">{space.building?.name || 'N/A'}</span>
+                                        <span className="detail-value">{space.buildingName || 'N/A'}</span>
                                     </div>
                                     <div className="detail-item">
                                         <span className="detail-label">Status:</span>
@@ -351,6 +417,13 @@ function SpacesPage() {
                                             {space.available ? 'Disponibil' : 'Închiriat'}
                                         </span>
                                     </div>
+                                    {/* Pentru owner, afișează info despre contracte */}
+                                    {user?.role === 'OWNER' && (
+                                        <div className="detail-item">
+                                            <span className="detail-label">Contracte:</span>
+                                            <span className="detail-value">{space.contractsCount || 0}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="space-card-footer">

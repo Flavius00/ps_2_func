@@ -2,13 +2,17 @@ package com.example.demo.controller;
 
 import com.example.demo.model.ComercialSpace;
 import com.example.demo.model.Building;
+import com.example.demo.model.Owner;
 import com.example.demo.service.ComercialSpaceService;
 import com.example.demo.service.BuildingService;
+import com.example.demo.service.OwnerService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/spaces")
@@ -16,10 +20,43 @@ import java.util.List;
 public class ComercialSpaceController {
     private final ComercialSpaceService spaceService;
     private final BuildingService buildingService;
+    private final OwnerService ownerService;
 
-    public ComercialSpaceController(ComercialSpaceService spaceService, BuildingService buildingService) {
+    public ComercialSpaceController(ComercialSpaceService spaceService,
+                                    BuildingService buildingService,
+                                    OwnerService ownerService) {
         this.spaceService = spaceService;
         this.buildingService = buildingService;
+        this.ownerService = ownerService;
+    }
+
+    @GetMapping("/getAll")
+    public ResponseEntity<List<ComercialSpace>> getAllSpaces() {
+        try {
+            List<ComercialSpace> spaces = spaceService.getAllSpaces();
+            if (spaces == null) {
+                spaces = List.of();
+            }
+
+            System.out.println("=== DEBUGGING SPACES ===");
+            System.out.println("Returning " + spaces.size() + " spaces to frontend");
+
+            for (ComercialSpace space : spaces) {
+                System.out.println("Space ID: " + space.getId() +
+                        ", Name: " + space.getName() +
+                        ", Owner ID: " + space.getOwnerId() +
+                        ", Owner Name: " + space.getOwnerName() +
+                        ", Building ID: " + space.getBuildingId() +
+                        ", Building Name: " + space.getBuildingName());
+            }
+            System.out.println("=== END DEBUGGING ===");
+
+            return ResponseEntity.ok(spaces);
+        } catch (Exception e) {
+            System.err.println("Error in getAllSpaces: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     @PostMapping("/delete/{id}")
@@ -37,22 +74,99 @@ public class ComercialSpaceController {
         return space;
     }
 
-    @GetMapping("/edit/{id}")
-    public String editSpace(@PathVariable Long id, Model model) {
-        ComercialSpace space = spaceService.getSpaceById(id);
-        if (space == null) {
-            return "redirect:/spaces";
-        }
-        List<Building> buildings = buildingService.getAllBuildings();
-        model.addAttribute("space", space);
-        model.addAttribute("buildings", buildings);
-        return "owners/edit-space";
-    }
-
+    // CORECTARE CRITICĂ: Update endpoint care păstrează owner-ul și building-ul
     @PostMapping("/update")
-    public String updateSpace(@RequestBody ComercialSpace space) {
-        spaceService.updateSpace(space);
-        return "redirect:/spaces";
+    public ResponseEntity<?> updateSpace(@RequestBody Map<String, Object> updateData) {
+        try {
+            System.out.println("Received update data: " + updateData);
+
+            // Extract space ID
+            Long spaceId = ((Number) updateData.get("id")).longValue();
+
+            // Get existing space to preserve relationships
+            ComercialSpace existingSpace = spaceService.getSpaceById(spaceId);
+            if (existingSpace == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            System.out.println("Existing space - Owner ID: " + existingSpace.getOwnerId() +
+                    ", Building ID: " + existingSpace.getBuildingId());
+
+            // Update only the fields that should be editable
+            if (updateData.containsKey("name")) {
+                existingSpace.setName((String) updateData.get("name"));
+            }
+            if (updateData.containsKey("description")) {
+                existingSpace.setDescription((String) updateData.get("description"));
+            }
+            if (updateData.containsKey("area")) {
+                existingSpace.setArea(((Number) updateData.get("area")).doubleValue());
+            }
+            if (updateData.containsKey("pricePerMonth")) {
+                existingSpace.setPricePerMonth(((Number) updateData.get("pricePerMonth")).doubleValue());
+            }
+            if (updateData.containsKey("address")) {
+                existingSpace.setAddress((String) updateData.get("address"));
+            }
+            if (updateData.containsKey("available")) {
+                existingSpace.setAvailable((Boolean) updateData.get("available"));
+            }
+            if (updateData.containsKey("latitude")) {
+                existingSpace.setLatitude(((Number) updateData.get("latitude")).doubleValue());
+            }
+            if (updateData.containsKey("longitude")) {
+                existingSpace.setLongitude(((Number) updateData.get("longitude")).doubleValue());
+            }
+
+            // Handle type-specific fields
+            if (updateData.containsKey("floors")) {
+                existingSpace.setFloors(((Number) updateData.get("floors")).intValue());
+            }
+            if (updateData.containsKey("numberOfRooms")) {
+                existingSpace.setNumberOfRooms(((Number) updateData.get("numberOfRooms")).intValue());
+            }
+            if (updateData.containsKey("hasReception")) {
+                existingSpace.setHasReception((Boolean) updateData.get("hasReception"));
+            }
+            if (updateData.containsKey("shopWindowSize")) {
+                existingSpace.setShopWindowSize(((Number) updateData.get("shopWindowSize")).doubleValue());
+            }
+            if (updateData.containsKey("hasCustomerEntrance")) {
+                existingSpace.setHasCustomerEntrance((Boolean) updateData.get("hasCustomerEntrance"));
+            }
+            if (updateData.containsKey("maxOccupancy")) {
+                existingSpace.setMaxOccupancy(((Number) updateData.get("maxOccupancy")).intValue());
+            }
+            if (updateData.containsKey("ceilingHeight")) {
+                existingSpace.setCeilingHeight(((Number) updateData.get("ceilingHeight")).doubleValue());
+            }
+            if (updateData.containsKey("hasLoadingDock")) {
+                existingSpace.setHasLoadingDock((Boolean) updateData.get("hasLoadingDock"));
+            }
+            if (updateData.containsKey("securityLevel")) {
+                existingSpace.setSecurityLevel(
+                        ComercialSpace.SecurityLevel.valueOf((String) updateData.get("securityLevel")));
+            }
+
+            // IMPORTANT: NU schimba owner-ul sau building-ul!
+            // Acestea rămân neschimbate pentru a păstra integritatea datelor
+
+            System.out.println("Before update - Owner ID: " + existingSpace.getOwnerId() +
+                    ", Building ID: " + existingSpace.getBuildingId());
+
+            ComercialSpace updatedSpace = spaceService.updateSpace(existingSpace);
+
+            System.out.println("After update - Owner ID: " + updatedSpace.getOwnerId() +
+                    ", Building ID: " + updatedSpace.getBuildingId());
+
+            return ResponseEntity.ok(updatedSpace);
+
+        } catch (Exception e) {
+            System.err.println("Error updating space: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body("Failed to update space: " + e.getMessage());
+        }
     }
 
     @GetMapping("/create")
@@ -63,32 +177,68 @@ public class ComercialSpaceController {
     }
 
     @PostMapping("/create")
-    public ComercialSpace createSpace(@RequestBody ComercialSpace space) {
-        return spaceService.addSpace(space);
-    }
+    public ResponseEntity<ComercialSpace> createSpace(@RequestBody ComercialSpace space) {
+        try {
+            System.out.println("Creating space: " + space.getName() + " for owner ID: " +
+                    (space.getOwner() != null ? space.getOwner().getId() : "NULL"));
 
-    @GetMapping("getAll")
-    public List<ComercialSpace> getAllSpaces() {
-        return spaceService.getAllSpaces();
+            ComercialSpace createdSpace = spaceService.addSpace(space);
+
+            System.out.println("Created space ID: " + createdSpace.getId() +
+                    ", Owner ID: " + createdSpace.getOwnerId() +
+                    ", Owner Name: " + createdSpace.getOwnerName());
+
+            return ResponseEntity.ok(createdSpace);
+        } catch (Exception e) {
+            System.err.println("Error creating space: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @GetMapping("/available")
-    public List<ComercialSpace> getAvailableSpaces() {
-        return spaceService.getAvailableSpaces();
+    public ResponseEntity<List<ComercialSpace>> getAvailableSpaces() {
+        try {
+            List<ComercialSpace> spaces = spaceService.getAvailableSpaces();
+            return ResponseEntity.ok(spaces != null ? spaces : List.of());
+        } catch (Exception e) {
+            System.err.println("Error getting available spaces: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     @GetMapping("/type/{spaceType}")
-    public List<ComercialSpace> getSpacesByType(@PathVariable String spaceType) {
-        return spaceService.getSpacesByType(spaceType);
+    public ResponseEntity<List<ComercialSpace>> getSpacesByType(@PathVariable String spaceType) {
+        try {
+            List<ComercialSpace> spaces = spaceService.getSpacesByType(spaceType);
+            return ResponseEntity.ok(spaces != null ? spaces : List.of());
+        } catch (Exception e) {
+            System.err.println("Error getting spaces by type: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     @GetMapping("/owner/{ownerId}")
-    public List<ComercialSpace> getSpacesByOwner(@PathVariable Long ownerId) {
-        return spaceService.getSpacesByOwner(ownerId);
+    public ResponseEntity<List<ComercialSpace>> getSpacesByOwner(@PathVariable Long ownerId) {
+        try {
+            System.out.println("Getting spaces for owner ID: " + ownerId);
+            List<ComercialSpace> spaces = spaceService.getSpacesByOwner(ownerId);
+            System.out.println("Found " + (spaces != null ? spaces.size() : 0) + " spaces for owner " + ownerId);
+            return ResponseEntity.ok(spaces != null ? spaces : List.of());
+        } catch (Exception e) {
+            System.err.println("Error getting spaces by owner: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     @GetMapping("/building/{buildingId}")
-    public List<ComercialSpace> getSpacesByBuilding(@PathVariable Long buildingId) {
-        return spaceService.getSpacesByBuilding(buildingId);
+    public ResponseEntity<List<ComercialSpace>> getSpacesByBuilding(@PathVariable Long buildingId) {
+        try {
+            List<ComercialSpace> spaces = spaceService.getSpacesByBuilding(buildingId);
+            return ResponseEntity.ok(spaces != null ? spaces : List.of());
+        } catch (Exception e) {
+            System.err.println("Error getting spaces by building: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
     }
 }

@@ -4,6 +4,7 @@ import lombok.*;
 import jakarta.persistence.*;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "comercial_spaces")
@@ -43,14 +44,16 @@ public class ComercialSpace {
     @Column(nullable = false)
     private Boolean available = true;
 
-    // Relația cu Owner - doar referința către owner, fără @JsonManagedReference
+    // CRITIC: Relația cu Owner - IGNORĂ serializarea pentru a evita loop-uri
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
+    @JsonIgnore // Evită serializarea directă a owner-ului
     private Owner owner;
 
-    // Relația cu Building - doar referința către building
+    // CRITIC: Relația cu Building - IGNORĂ serializarea pentru a evita loop-uri
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "building_id")
+    @JsonIgnore // Evită serializarea directă a building-ului
     private Building building;
 
     // Cascadă pentru parking - salvează automat parking-ul când salvează space-ul
@@ -79,11 +82,15 @@ public class ComercialSpace {
     @Enumerated(EnumType.STRING)
     private SecurityLevel securityLevel;
 
-    // Relația cu contractele - un spațiu poate avea multiple contracte de-a lungul timpului
+    // CRITIC: Relația cu contractele - IGNORĂ serializarea pentru a evita loop-uri
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore // Evită serializarea directă a contractelor
     private List<RentalContract> contracts;
 
-    // Metode helper pentru a accesa informațiile owner-ului fără a cauza loop
+    // ===== METODE HELPER PENTRU JSON =====
+    // Acestea returnează doar informațiile necesare fără a cauza loop-uri
+
+    // Informații despre Owner (fără referința circulară)
     @JsonProperty("ownerId")
     public Long getOwnerId() {
         return owner != null ? owner.getId() : null;
@@ -109,7 +116,7 @@ public class ComercialSpace {
         return owner != null ? owner.getCompanyName() : null;
     }
 
-    // Metode helper pentru building
+    // Informații despre Building (fără referința circulară)
     @JsonProperty("buildingId")
     public Long getBuildingId() {
         return building != null ? building.getId() : null;
@@ -123,6 +130,30 @@ public class ComercialSpace {
     @JsonProperty("buildingAddress")
     public String getBuildingAddress() {
         return building != null ? building.getAddress() : null;
+    }
+
+    @JsonProperty("buildingTotalFloors")
+    public Integer getBuildingTotalFloors() {
+        return building != null ? building.getTotalFloors() : null;
+    }
+
+    @JsonProperty("buildingYearBuilt")
+    public Integer getBuildingYearBuilt() {
+        return building != null ? building.getYearBuilt() : null;
+    }
+
+    // Informații despre contracte (doar count, fără lista completă)
+    @JsonProperty("contractsCount")
+    public Integer getContractsCount() {
+        return contracts != null ? contracts.size() : 0;
+    }
+
+    @JsonProperty("hasActiveContract")
+    public Boolean getHasActiveContract() {
+        if (contracts == null || contracts.isEmpty()) return false;
+        return contracts.stream()
+                .anyMatch(contract ->
+                        RentalContract.ContractStatus.ACTIVE.equals(contract.getStatus()));
     }
 
     public enum SpaceType {

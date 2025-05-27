@@ -98,16 +98,11 @@ function RentalContractPage() {
         setIsSubmitting(true);
 
         try {
-
-            // Creează obiectul pentru contract
+            // CORECTARE CRITICĂ: Trimite datele în formatul corect pentru backend
             const contractData = {
-                space: space,
-                tenant: {
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    phone: user.phone
-                },
+                // Trimite doar ID-urile pentru space și tenant
+                spaceId: space.id,
+                tenantId: user.id,
                 startDate: formattedStartDate,
                 endDate: formattedEndDate,
                 monthlyRent: monthlyRent,
@@ -116,13 +111,17 @@ function RentalContractPage() {
                 isPaid: true,
                 dateCreated: formattedStartDate,
                 contractNumber: `RENT-${Date.now()}`,
-                notes: `Contract încheiat electronic. Metodă de plată: ${paymentMethod}. Durata: ${contractDuration} luni.`,
+                notes: `Contract încheiat electronic. Metodă de plată: ${paymentMethod}. Durata: ${contractDuration} luni. Semnătură: ${signatureData}`,
                 paymentMethod: paymentMethod,
                 signature: signatureData
             };
 
+            console.log('Sending contract data:', contractData);
+
             // Trimite datele către backend
             const response = await axios.post('http://localhost:8080/contracts/create', contractData);
+
+            console.log('Contract created successfully:', response.data);
 
             // Actualizează spațiul ca fiind închiriat
             await axios.post('http://localhost:8080/spaces/update', {
@@ -130,17 +129,30 @@ function RentalContractPage() {
                 available: false
             });
 
+            // Creează obiectul pentru pagina de confirmare
+            const contractForConfirmation = {
+                ...contractData,
+                id: response.data.id,
+                space: space,
+                tenant: user
+            };
+
             // Navigare către pagina de confirmare
             navigate('/payment/confirm', {
                 state: {
-                    contract: contractData,
+                    contract: contractForConfirmation,
                     space: space
                 }
             });
 
         } catch (error) {
             console.error('Eroare la crearea contractului:', error);
-            setError('Nu s-a putut crea contractul. Vă rugăm încercați din nou mai târziu.');
+            if (error.response) {
+                console.error('Server response:', error.response.data);
+                setError(`Nu s-a putut crea contractul: ${error.response.data}`);
+            } else {
+                setError('Nu s-a putut crea contractul. Vă rugăm încercați din nou mai târziu.');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -151,7 +163,12 @@ function RentalContractPage() {
     }
 
     if (error) {
-        return <div className="error-container">{error}</div>;
+        return (
+            <div className="error-container">
+                <p>{error}</p>
+                <button onClick={() => navigate('/spaces')}>Înapoi la Spații</button>
+            </div>
+        );
     }
 
     return (
@@ -175,9 +192,9 @@ function RentalContractPage() {
                                 <div className="party">
                                     <h5>I. PĂRȚILE CONTRACTANTE</h5>
                                     <p>
-                                        <strong>1.1 Proprietar:</strong> {space.owner?.name || 'Proprietarul spațiului'},
-                                        cu adresa în {space.owner?.address || 'adresa proprietarului'},
-                                        având CUI {space.owner?.taxId || 'CUI proprietar'},
+                                        <strong>1.1 Proprietar:</strong> {space.ownerName || 'Proprietarul spațiului'},
+                                        cu adresa în {space.ownerAddress || 'adresa proprietarului'},
+                                        având CUI {space.ownerTaxId || 'CUI proprietar'},
                                         denumit în continuare "PROPRIETAR"
                                     </p>
                                     <p>
@@ -192,7 +209,7 @@ function RentalContractPage() {
                             <div className="contract-article">
                                 <h5>II. OBIECTUL CONTRACTULUI</h5>
                                 <p>
-                                    2.1 PROPRIETARUL închiriază CHIRIAȘULUI spațiul comercial situat la adresa {space.address || space.building?.address},
+                                    2.1 PROPRIETARUL închiriază CHIRIAȘULUI spațiul comercial situat la adresa {space.address || space.buildingAddress},
                                     având o suprafață de {space.area} m², destinat pentru activități comerciale.
                                 </p>
                                 <p>
@@ -309,7 +326,7 @@ function RentalContractPage() {
                         </div>
                         <div className="summary-item">
                             <span className="summary-label">Adresă:</span>
-                            <span className="summary-value">{space.address || space.building?.address}</span>
+                            <span className="summary-value">{space.address || space.buildingAddress}</span>
                         </div>
                         <div className="summary-item">
                             <span className="summary-label">Suprafață:</span>

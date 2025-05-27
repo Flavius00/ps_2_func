@@ -17,15 +17,21 @@ function SpaceDetailsPage() {
         const storedUser = JSON.parse(localStorage.getItem('user'));
         setUser(storedUser);
 
+        console.log('Current user:', storedUser); // DEBUG
+
         const fetchSpace = async () => {
             setLoading(true);
             try {
                 // Use space data from state if available, otherwise fetch from API
                 if (location.state?.spaceData) {
-                    setSpace(location.state.spaceData);
-                    setFormData(location.state.spaceData);
+                    const spaceData = location.state.spaceData;
+                    console.log('Space data from state:', spaceData); // DEBUG
+                    setSpace(spaceData);
+                    setFormData(spaceData);
                 } else {
+                    console.log('Fetching space from API with ID:', id); // DEBUG
                     const response = await axios.get(`http://localhost:8080/spaces/details/${id}`);
+                    console.log('Space data from API:', response.data); // DEBUG
                     setSpace(response.data);
                     setFormData(response.data);
                 }
@@ -40,37 +46,61 @@ function SpaceDetailsPage() {
     }, [id, location.state]);
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => {
-            if (name.includes('.')) {
-                const [objName, objProp] = name.split('.');
-                return {
-                    ...prev,
-                    [objName]: {
-                        ...prev[objName],
-                        [objProp]: value
-                    }
-                };
-            }
-            return { ...prev, [name]: value };
-        });
-    };
+        const { name, value, type, checked } = e.target;
 
-    const handleCheckboxChange = (e) => {
-        const { name, checked } = e.target;
-        setFormData(prev => ({ ...prev, [name]: checked }));
+        if (type === 'checkbox') {
+            setFormData(prev => ({ ...prev, [name]: checked }));
+        } else if (type === 'number') {
+            setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:8080/spaces/update', formData);
-            setSpace(formData);
+            // CORECTARE CRITICĂ: Trimite doar datele care pot fi editate
+            // NU trimite owner sau building pentru a evita suprascrierea lor
+            const updateData = {
+                id: space.id,
+                name: formData.name,
+                description: formData.description,
+                area: formData.area,
+                pricePerMonth: formData.pricePerMonth,
+                address: formData.address,
+                available: formData.available,
+                latitude: formData.latitude || space.latitude,
+                longitude: formData.longitude || space.longitude,
+                // Include doar câmpurile specifice tipului de spațiu dacă există
+                ...(formData.floors && { floors: formData.floors }),
+                ...(formData.numberOfRooms && { numberOfRooms: formData.numberOfRooms }),
+                ...(formData.hasReception !== undefined && { hasReception: formData.hasReception }),
+                ...(formData.shopWindowSize && { shopWindowSize: formData.shopWindowSize }),
+                ...(formData.hasCustomerEntrance !== undefined && { hasCustomerEntrance: formData.hasCustomerEntrance }),
+                ...(formData.maxOccupancy && { maxOccupancy: formData.maxOccupancy }),
+                ...(formData.ceilingHeight && { ceilingHeight: formData.ceilingHeight }),
+                ...(formData.hasLoadingDock !== undefined && { hasLoadingDock: formData.hasLoadingDock }),
+                ...(formData.securityLevel && { securityLevel: formData.securityLevel })
+            };
+
+            console.log('Updating space with data:', updateData); // DEBUG
+
+            const response = await axios.post('http://localhost:8080/spaces/update', updateData);
+
+            // Actualizează space-ul local cu datele returnat de server
+            setSpace(response.data);
+            setFormData(response.data);
             setIsEditing(false);
             alert('Space updated successfully!');
         } catch (error) {
             console.error('Error updating space:', error);
-            alert('Failed to update space. Please try again.');
+            if (error.response) {
+                console.error('Server response:', error.response.data);
+                alert(`Failed to update space: ${error.response.data}`);
+            } else {
+                alert('Failed to update space. Please try again.');
+            }
         }
     };
 
@@ -99,8 +129,21 @@ function SpaceDetailsPage() {
         return <div className="error-message">Space not found</div>;
     }
 
-    const canEdit = user?.role === 'OWNER' && space.owner?.id === user.id;
+    // CORECTARE CRITICĂ: Verificarea ownership-ului folosind proprietățile JSON
+    const canEdit = user?.role === 'OWNER' && (
+        space.ownerId === user.id ||
+        (space.owner && space.owner.id === user.id)
+    );
+
     const canRent = user?.role === 'TENANT' && space.available;
+
+    console.log('Can edit check:', {
+        userRole: user?.role,
+        userId: user?.id,
+        spaceOwnerId: space.ownerId,
+        spaceOwnerFromObj: space.owner?.id,
+        canEdit
+    }); // DEBUG
 
     const renderAmenities = () => {
         if (!space.amenities || space.amenities.length === 0) {
@@ -193,6 +236,23 @@ function SpaceDetailsPage() {
                 <div className="space-type-badge">{space.spaceType}</div>
             </div>
 
+            {/* DEBUG INFO pentru Owner */}
+            {user?.role === 'OWNER' && (
+                <div style={{
+                    backgroundColor: '#e3f2fd',
+                    padding: '10px',
+                    margin: '10px 0',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                }}>
+                    <strong>DEBUG INFO:</strong>
+                    User ID: {user.id},
+                    Space Owner ID: {space.ownerId},
+                    Can Edit: {canEdit ? 'YES' : 'NO'},
+                    Owner Name: {space.ownerName}
+                </div>
+            )}
+
             {isEditing ? (
                 <form className="edit-form" onSubmit={handleSubmit}>
                     <div className="form-section">
@@ -218,7 +278,7 @@ function SpaceDetailsPage() {
                         </div>
                         <div className="form-row">
                             <div className="form-group">
-                                    <label>Price (€/month):</label>
+                                <label>Price (€/month):</label>
                                 <input
                                     type="number"
                                     name="pricePerMonth"
@@ -253,14 +313,12 @@ function SpaceDetailsPage() {
                                     type="checkbox"
                                     name="available"
                                     checked={formData.available || false}
-                                    onChange={handleCheckboxChange}
+                                    onChange={handleChange}
                                 />
                                 Available for Rent
                             </label>
                         </div>
                     </div>
-
-                    {/* Type-specific fields would go here */}
 
                     <div className="form-actions">
                         <button type="submit" className="btn btn-save">Save Changes</button>
@@ -286,12 +344,16 @@ function SpaceDetailsPage() {
                                     <span className="detail-value">{space.pricePerMonth} €/month</span>
                                 </div>
                                 <div className="detail-item">
+                                    <span className="detail-label">Area:</span>
+                                    <span className="detail-value">{space.area} m²</span>
+                                </div>
+                                <div className="detail-item">
                                     <span className="detail-label">Building:</span>
-                                    <span className="detail-value">{space.building?.name || 'N/A'}</span>
+                                    <span className="detail-value">{space.buildingName || 'N/A'}</span>
                                 </div>
                                 <div className="detail-item">
                                     <span className="detail-label">Address:</span>
-                                    <span className="detail-value">{space.address || 'N/A'}</span>
+                                    <span className="detail-value">{space.address || space.buildingAddress || 'N/A'}</span>
                                 </div>
                                 <div className="detail-item">
                                     <span className="detail-label">Status:</span>
@@ -301,7 +363,7 @@ function SpaceDetailsPage() {
                                 </div>
                                 <div className="detail-item">
                                     <span className="detail-label">Owner:</span>
-                                    <span className="detail-value">{space.owner?.name || 'N/A'}</span>
+                                    <span className="detail-value">{space.ownerName || 'N/A'}</span>
                                 </div>
                                 {space.parking && (
                                     <div className="detail-item">
@@ -349,20 +411,21 @@ function SpaceDetailsPage() {
                                     Rent This Space
                                 </button>
                             )}
+                            {!canEdit && !canRent && (
+                                <p style={{color: '#7f8c8d', fontSize: '14px'}}>
+                                    No actions available for your role.
+                                </p>
+                            )}
                         </div>
 
                         <div className="contact-card">
                             <h3>Contact Information</h3>
-                            {space.owner ? (
-                                <div className="contact-details">
-                                    <p><strong>Owner:</strong> {space.owner.name}</p>
-                                    <p><strong>Email:</strong> {space.owner.email}</p>
-                                    <p><strong>Phone:</strong> {space.owner.phone}</p>
-                                    <p><strong>Company:</strong> {space.owner.companyName}</p>
-                                </div>
-                            ) : (
-                                <p>Contact information not available</p>
-                            )}
+                            <div className="contact-details">
+                                <p><strong>Owner:</strong> {space.ownerName || 'N/A'}</p>
+                                <p><strong>Email:</strong> {space.ownerEmail || 'N/A'}</p>
+                                <p><strong>Phone:</strong> {space.ownerPhone || 'N/A'}</p>
+                                <p><strong>Company:</strong> {space.ownerCompanyName || 'N/A'}</p>
+                            </div>
                         </div>
                     </div>
                 </div>

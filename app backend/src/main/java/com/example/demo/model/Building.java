@@ -2,7 +2,6 @@ package com.example.demo.model;
 
 import lombok.*;
 import jakarta.persistence.*;
-import java.util.List;
 
 @Entity
 @Table(name = "buildings")
@@ -30,8 +29,8 @@ public class Building {
 
     private Double longitude;
 
-    // ELIMINAT @JsonManagedReference - nu mai avem nevoie de adnotări JSON circulare
-    // Relația este păstrată pentru integritatea referențială, dar nu va fi serializată automat
-    @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ComercialSpace> spaces;
+    // ELIMINAT: Lista de ComercialSpace
+    // Motivul: Relația este gestionată prin ComercialSpace.building
+    // Pentru a obține spațiile unei clădiri, folosim query-uri în repository/service
+    // Exemplu: comercialSpaceRepository.findByBuildingId(buildingId)
 }

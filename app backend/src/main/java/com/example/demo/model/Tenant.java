@@ -3,7 +3,6 @@ package com.example.demo.model;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import jakarta.persistence.*;
-import java.util.List;
 
 @Entity
 @DiscriminatorValue("TENANT")
@@ -20,12 +19,14 @@ public class Tenant extends User {
 
     private String taxId;
 
-
-
-    // ELIMINAT: Lista directă de CommercialSpace
-    // Motivul: Spațiile închiriate sunt accesibile prin contracts -> space
-    // Pentru a obține spațiile închiriate de un tenant, folosim:
+    // ELIMINAT COMPLET: Lista de RentalContract sau ComercialSpace
+    // Motivul: Relațiile sunt deja gestionate prin RentalContract.tenant
+    // Pentru a obține contractele unui tenant, folosim:
+    // rentalContractRepository.findByTenantId(tenantId)
+    // Pentru spațiile închiriate:
     // tenant.getContracts().stream().map(RentalContract::getSpace).collect(toList())
+
+    // NU MAI EXISTĂ referințe circulare prin liste!
 
     // Constructor care setează automat rolul
     public Tenant(String name, String email, String username, String password) {

@@ -4,8 +4,8 @@ import lombok.*;
 import jakarta.persistence.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "rental_contracts")
@@ -19,12 +19,16 @@ public class RentalContract {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // CRITIC: Relația cu Space - IGNORĂ serializarea pentru a evita loop-uri
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "space_id", nullable = false)
+    @JsonIgnore // Evită serializarea directă a space-ului
     private ComercialSpace space;
 
+    // CRITIC: Relația cu Tenant - IGNORĂ serializarea pentru a evita loop-uri
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
+    @JsonIgnore // Evită serializarea directă a tenant-ului
     private Tenant tenant;
 
     @DateTimeFormat(pattern = "yyyy-MM-dd")
@@ -56,7 +60,10 @@ public class RentalContract {
     @Column(length = 1000)
     private String notes;
 
-    // Metode helper pentru a accesa informațiile space-ului fără a cauza loop
+    // ===== METODE HELPER PENTRU JSON =====
+    // Acestea returnează doar informațiile necesare fără a cauza loop-uri
+
+    // Informații despre Space (fără referința circulară)
     @JsonProperty("spaceId")
     public Long getSpaceId() {
         return space != null ? space.getId() : null;
@@ -77,7 +84,13 @@ public class RentalContract {
         return space != null ? space.getArea() : null;
     }
 
-    // Metode helper pentru tenant
+    @JsonProperty("spaceType")
+    public String getSpaceType() {
+        return space != null && space.getSpaceType() != null ?
+                space.getSpaceType().toString() : null;
+    }
+
+    // Informații despre Tenant (fără referința circulară)
     @JsonProperty("tenantId")
     public Long getTenantId() {
         return tenant != null ? tenant.getId() : null;
@@ -91,6 +104,48 @@ public class RentalContract {
     @JsonProperty("tenantEmail")
     public String getTenantEmail() {
         return tenant != null ? tenant.getEmail() : null;
+    }
+
+    @JsonProperty("tenantPhone")
+    public String getTenantPhone() {
+        return tenant != null ? tenant.getPhone() : null;
+    }
+
+    @JsonProperty("tenantCompanyName")
+    public String getTenantCompanyName() {
+        return tenant != null ? tenant.getCompanyName() : null;
+    }
+
+    // Informații despre Owner prin Space (fără referința circulară)
+    @JsonProperty("ownerId")
+    public Long getOwnerId() {
+        return space != null && space.getOwner() != null ?
+                space.getOwner().getId() : null;
+    }
+
+    @JsonProperty("ownerName")
+    public String getOwnerName() {
+        return space != null && space.getOwner() != null ?
+                space.getOwner().getName() : null;
+    }
+
+    @JsonProperty("ownerEmail")
+    public String getOwnerEmail() {
+        return space != null && space.getOwner() != null ?
+                space.getOwner().getEmail() : null;
+    }
+
+    // Informații despre Building prin Space (fără referința circulară)
+    @JsonProperty("buildingId")
+    public Long getBuildingId() {
+        return space != null && space.getBuilding() != null ?
+                space.getBuilding().getId() : null;
+    }
+
+    @JsonProperty("buildingName")
+    public String getBuildingName() {
+        return space != null && space.getBuilding() != null ?
+                space.getBuilding().getName() : null;
     }
 
     public enum ContractStatus {
