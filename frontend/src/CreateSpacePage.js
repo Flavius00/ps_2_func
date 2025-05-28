@@ -124,20 +124,59 @@ function CreateSpacePage() {
         setError('');
 
         try {
-            // Pregătire date pentru trimitere
+            // CRITICAL FIX: Ensure buildingId is properly set
+            if (!formData.buildingId || formData.buildingId === '') {
+                setError('Vă rugăm să selectați o clădire.');
+                setLoading(false);
+                return;
+            }
+
+            console.log('=== CREATE SPACE FRONTEND DEBUG ===');
+            console.log('User:', user);
+            console.log('Form data before processing:', formData);
+
+            // CRITICAL FIX: Create proper objects for owner and building
             const spaceData = {
-                ...formData,
-                owner: { id: user.id },
-                building: { id: formData.buildingId }
+                name: formData.name,
+                description: formData.description,
+                area: formData.area,
+                pricePerMonth: formData.pricePerMonth,
+                address: formData.address,
+                latitude: formData.latitude,
+                longitude: formData.longitude,
+                spaceType: formData.spaceType,
+                available: formData.available,
+                amenities: formData.amenities,
+                // Type-specific fields
+                floors: formData.floors,
+                numberOfRooms: formData.numberOfRooms,
+                hasReception: formData.hasReception,
+                shopWindowSize: formData.shopWindowSize,
+                hasCustomerEntrance: formData.hasCustomerEntrance,
+                maxOccupancy: formData.maxOccupancy,
+                ceilingHeight: formData.ceilingHeight,
+                hasLoadingDock: formData.hasLoadingDock,
+                securityLevel: formData.securityLevel,
+                // CRITICAL FIX: Create proper owner and building objects
+                owner: {
+                    id: user.id
+                },
+                building: {
+                    id: parseInt(formData.buildingId)
+                }
             };
 
-            // Eliminăm buildingId deoarece am creat obiectul building
-            delete spaceData.buildingId;
+            console.log('Space data to send:', spaceData);
+            console.log('Owner ID:', spaceData.owner.id);
+            console.log('Building ID:', spaceData.building.id);
 
-            // Trimitem datele către server
+            // Send data to server
             const response = await axios.post('http://localhost:8080/spaces/create', spaceData);
 
-            // Navigăm înapoi la pagina cu spații
+            console.log('Space created successfully:', response.data);
+            console.log('=== END CREATE SPACE FRONTEND DEBUG ===');
+
+            // Navigate back to spaces page with success message
             navigate('/spaces', {
                 state: {
                     message: 'Spațiul a fost adăugat cu succes!',
@@ -146,7 +185,12 @@ function CreateSpacePage() {
             });
         } catch (error) {
             console.error('Eroare la crearea spațiului:', error);
-            setError('Nu s-a putut crea spațiul. Verificați datele introduse și încercați din nou.');
+            if (error.response) {
+                console.error('Server response:', error.response.data);
+                setError(`Nu s-a putut crea spațiul: ${error.response.data || 'Eroare nespecificată'}`);
+            } else {
+                setError('Nu s-a putut crea spațiul. Verificați datele introduse și încercați din nou.');
+            }
             setLoading(false);
         }
     };

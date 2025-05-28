@@ -1,7 +1,11 @@
 package com.example.demo.service.impl;
 
 import com.example.demo.model.ComercialSpace;
+import com.example.demo.model.Owner;
+import com.example.demo.model.Building;
 import com.example.demo.repository.ComercialSpaceRepository;
+import com.example.demo.repository.OwnerRepository;
+import com.example.demo.repository.BuildingRepository;
 import com.example.demo.service.ComercialSpaceService;
 import com.example.demo.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -13,13 +17,42 @@ import java.util.List;
 @Transactional
 public class ComercialSpaceServiceImpl implements ComercialSpaceService {
     private final ComercialSpaceRepository spaceRepository;
+    private final OwnerRepository ownerRepository;
+    private final BuildingRepository buildingRepository;
 
-    public ComercialSpaceServiceImpl(ComercialSpaceRepository spaceRepository) {
+    public ComercialSpaceServiceImpl(ComercialSpaceRepository spaceRepository,
+                                     OwnerRepository ownerRepository,
+                                     BuildingRepository buildingRepository) {
         this.spaceRepository = spaceRepository;
+        this.ownerRepository = ownerRepository;
+        this.buildingRepository = buildingRepository;
     }
 
     @Override
     public ComercialSpace addSpace(ComercialSpace space) {
+        // CRITICIAL FIX: Validate and fetch owner and building
+        if (space.getOwner() == null || space.getOwner().getId() == null) {
+            throw new IllegalArgumentException("Owner is required for creating a space");
+        }
+
+        if (space.getBuilding() == null || space.getBuilding().getId() == null) {
+            throw new IllegalArgumentException("Building is required for creating a space");
+        }
+
+        // Fetch the actual Owner and Building entities from database
+        Owner owner = ownerRepository.findById(space.getOwner().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Owner not found with id: " + space.getOwner().getId()));
+
+        Building building = buildingRepository.findById(space.getBuilding().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Building not found with id: " + space.getBuilding().getId()));
+
+        // Set the fully loaded entities
+        space.setOwner(owner);
+        space.setBuilding(building);
+
+        System.out.println("Creating space: " + space.getName() + " for owner ID: " +
+                (space.getOwner() != null ? space.getOwner().getId() : "NULL"));
+
         return spaceRepository.save(space);
     }
 
@@ -29,12 +62,11 @@ public class ComercialSpaceServiceImpl implements ComercialSpaceService {
         try {
             List<ComercialSpace> spaces = spaceRepository.findAll();
             System.out.println("Service: Found " + spaces.size() + " spaces in database");
-            // Asigură-te că nu returnezi null
             return spaces != null ? spaces : List.of();
         } catch (Exception e) {
             System.err.println("Error in getAllSpaces service: " + e.getMessage());
             e.printStackTrace();
-            return List.of(); // Returnează listă goală în caz de eroare
+            return List.of();
         }
     }
 
@@ -50,6 +82,19 @@ public class ComercialSpaceServiceImpl implements ComercialSpaceService {
         if (!spaceRepository.existsById(space.getId())) {
             throw new ResourceNotFoundException("Commercial space not found with id: " + space.getId());
         }
+
+        // Get existing space to preserve owner and building relationships
+        ComercialSpace existingSpace = spaceRepository.findById(space.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Commercial space not found with id: " + space.getId()));
+
+        // Preserve owner and building relationships if not provided in update
+        if (space.getOwner() == null) {
+            space.setOwner(existingSpace.getOwner());
+        }
+        if (space.getBuilding() == null) {
+            space.setBuilding(existingSpace.getBuilding());
+        }
+
         return spaceRepository.save(space);
     }
 

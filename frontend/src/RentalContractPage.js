@@ -125,7 +125,7 @@ function RentalContractPage() {
 
             // Actualizează spațiul ca fiind închiriat
             await axios.post('http://localhost:8080/spaces/update', {
-                ...space,
+                id: space.id,
                 available: false
             });
 

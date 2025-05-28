@@ -176,17 +176,89 @@ public class ComercialSpaceController {
         return "owners/create-space";
     }
 
+    // Replace the createSpace method in ComercialSpaceController.java with this:
+
     @PostMapping("/create")
-    public ResponseEntity<ComercialSpace> createSpace(@RequestBody ComercialSpace space) {
+    public ResponseEntity<ComercialSpace> createSpace(@RequestBody Map<String, Object> requestData) {
         try {
-            System.out.println("Creating space: " + space.getName() + " for owner ID: " +
-                    (space.getOwner() != null ? space.getOwner().getId() : "NULL"));
+            System.out.println("=== CREATE SPACE DEBUG ===");
+            System.out.println("Raw request data: " + requestData);
+
+            // Extract owner ID
+            Long ownerId = null;
+            if (requestData.get("owner") instanceof Map) {
+                Map<String, Object> ownerData = (Map<String, Object>) requestData.get("owner");
+                if (ownerData.get("id") != null) {
+                    ownerId = ((Number) ownerData.get("id")).longValue();
+                }
+            }
+
+            // Extract building ID
+            Long buildingId = null;
+            if (requestData.get("building") instanceof Map) {
+                Map<String, Object> buildingData = (Map<String, Object>) requestData.get("building");
+                if (buildingData.get("id") != null) {
+                    buildingId = ((Number) buildingData.get("id")).longValue();
+                }
+            }
+
+            System.out.println("Extracted Owner ID: " + ownerId);
+            System.out.println("Extracted Building ID: " + buildingId);
+
+            if (ownerId == null) {
+                System.err.println("ERROR: Owner ID is missing from request");
+                return ResponseEntity.badRequest().body(null);
+            }
+
+            if (buildingId == null) {
+                System.err.println("ERROR: Building ID is missing from request");
+                return ResponseEntity.badRequest().body(null);
+            }
+
+            // Create ComercialSpace object
+            ComercialSpace space = ComercialSpace.builder()
+                    .name((String) requestData.get("name"))
+                    .description((String) requestData.get("description"))
+                    .area(requestData.get("area") != null ? ((Number) requestData.get("area")).doubleValue() : 0.0)
+                    .pricePerMonth(requestData.get("pricePerMonth") != null ? ((Number) requestData.get("pricePerMonth")).doubleValue() : 0.0)
+                    .address((String) requestData.get("address"))
+                    .latitude(requestData.get("latitude") != null ? ((Number) requestData.get("latitude")).doubleValue() : 0.0)
+                    .longitude(requestData.get("longitude") != null ? ((Number) requestData.get("longitude")).doubleValue() : 0.0)
+                    .available((Boolean) requestData.getOrDefault("available", true))
+                    .spaceType(requestData.get("spaceType") != null ?
+                            ComercialSpace.SpaceType.valueOf((String) requestData.get("spaceType")) :
+                            ComercialSpace.SpaceType.OFFICE)
+                    // Create Owner and Building objects with IDs
+                    .owner(Owner.builder().id(ownerId).build())
+                    .building(Building.builder().id(buildingId).build())
+                    // Type-specific fields
+                    .floors(requestData.get("floors") != null ? ((Number) requestData.get("floors")).intValue() : null)
+                    .numberOfRooms(requestData.get("numberOfRooms") != null ? ((Number) requestData.get("numberOfRooms")).intValue() : null)
+                    .hasReception((Boolean) requestData.getOrDefault("hasReception", false))
+                    .shopWindowSize(requestData.get("shopWindowSize") != null ? ((Number) requestData.get("shopWindowSize")).doubleValue() : null)
+                    .hasCustomerEntrance((Boolean) requestData.getOrDefault("hasCustomerEntrance", true))
+                    .maxOccupancy(requestData.get("maxOccupancy") != null ? ((Number) requestData.get("maxOccupancy")).intValue() : null)
+                    .ceilingHeight(requestData.get("ceilingHeight") != null ? ((Number) requestData.get("ceilingHeight")).doubleValue() : null)
+                    .hasLoadingDock((Boolean) requestData.getOrDefault("hasLoadingDock", false))
+                    .securityLevel(requestData.get("securityLevel") != null ?
+                            ComercialSpace.SecurityLevel.valueOf((String) requestData.get("securityLevel")) :
+                            ComercialSpace.SecurityLevel.MEDIUM)
+                    .build();
+
+            // Handle amenities
+            if (requestData.get("amenities") instanceof List) {
+                space.setAmenities((List<String>) requestData.get("amenities"));
+            }
+
+            System.out.println("Created space object with Owner ID: " + space.getOwner().getId() +
+                    " and Building ID: " + space.getBuilding().getId());
 
             ComercialSpace createdSpace = spaceService.addSpace(space);
 
-            System.out.println("Created space ID: " + createdSpace.getId() +
+            System.out.println("Space created successfully - ID: " + createdSpace.getId() +
                     ", Owner ID: " + createdSpace.getOwnerId() +
                     ", Owner Name: " + createdSpace.getOwnerName());
+            System.out.println("=== END CREATE SPACE DEBUG ===");
 
             return ResponseEntity.ok(createdSpace);
         } catch (Exception e) {
