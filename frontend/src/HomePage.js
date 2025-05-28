@@ -29,6 +29,11 @@ function HomePage({ setUser }) {
                 <p>Manage your buildings and facility details.</p>
                 <button className="btn btn-sm" onClick={() => navigate('/buildings')}>View Buildings</button>
             </div>
+            <div className="info-card">
+                <h3>💬 Messages</h3>
+                <p>Communicate with tenants and manage inquiries.</p>
+                <button className="btn btn-sm" onClick={() => navigate('/messages')}>View Messages</button>
+            </div>
         </>
     );
 
@@ -49,6 +54,11 @@ function HomePage({ setUser }) {
                 <p>Explore commercial properties on an interactive map.</p>
                 <button className="btn btn-sm" onClick={() => navigate('/map')}>Open Map</button>
             </div>
+            <div className="info-card">
+                <h3>💬 Messages</h3>
+                <p>Contact property owners and get answers to your questions.</p>
+                <button className="btn btn-sm" onClick={() => navigate('/messages')}>View Messages</button>
+            </div>
         </>
     );
 
@@ -68,6 +78,11 @@ function HomePage({ setUser }) {
                 <h3>📝 All Contracts</h3>
                 <p>Monitor and manage all rental contracts.</p>
                 <button className="btn btn-sm" onClick={() => navigate('/contracts')}>View Contracts</button>
+            </div>
+            <div className="info-card">
+                <h3>💬 Messages</h3>
+                <p>Monitor system-wide communications and support.</p>
+                <button className="btn btn-sm" onClick={() => navigate('/messages')}>View Messages</button>
             </div>
         </>
     );
@@ -94,6 +109,8 @@ function HomePage({ setUser }) {
                 <div className="navbar-menu">
                     <button className="nav-btn" onClick={() => navigate('/spaces')}>Spaces</button>
                     <button className="nav-btn" onClick={() => navigate("/contracts")}>Contracts</button>
+                    <button className="nav-btn" onClick={() => navigate("/messages")}>Messages</button>
+                    <button className="nav-btn" onClick={() => navigate("/notifications")}>Notifications</button>
                     <button className="nav-btn" onClick={() => navigate("/profile")}>Profile</button>
                     <button className="nav-btn" onClick={() => navigate("/map")}>Map</button>
                     <button className="nav-btn logout" onClick={handleLogout}>Logout</button>
@@ -151,7 +168,6 @@ function HomePage({ setUser }) {
                     </div>
                 </div>
             </div>
-
 
             <footer className="homepage-footer">
                 <p>© 2025 Commercial Space Rental | <a href="mailto:support@commercial-rental.com">support@commercial-rental.com</a></p>

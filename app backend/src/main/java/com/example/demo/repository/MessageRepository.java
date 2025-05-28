@@ -2,6 +2,7 @@ package com.example.demo.repository;
 
 import com.example.demo.model.Message;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -52,7 +53,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT m FROM Message m WHERE m.sentAt > :since ORDER BY m.sentAt ASC")
     List<Message> findMessagesSince(@Param("since") LocalDateTime since);
 
-    // Mark messages as read
+    // Mark messages as read - FIXED with @Modifying and @Transactional
+    @Modifying
     @Query("UPDATE Message m SET m.isRead = true WHERE m.recipient.id = :userId AND m.sender.id = :senderId AND m.isRead = false")
-    void markMessagesAsRead(@Param("userId") Long userId, @Param("senderId") Long senderId);
+    int markMessagesAsRead(@Param("userId") Long userId, @Param("senderId") Long senderId);
 }

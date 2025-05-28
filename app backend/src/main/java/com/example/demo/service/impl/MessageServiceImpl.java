@@ -247,5 +247,31 @@ public class MessageServiceImpl implements MessageService {
         if (!message.getSenderId().equals(userId)) {
             throw new InsufficientPermissionsException("You can only delete your own messages");
         }
+
+        messageRepository.deleteById(messageId);
+        log.info("Message {} deleted successfully", messageId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean canUserAccessMessage(Long messageId, Long userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
+
+        return message.getSenderId().equals(userId) || message.getRecipientId().equals(userId);
+    }
+
+    // Helper method to parse message type
+    private Message.MessageType parseMessageType(String messageType) {
+        if (messageType == null || messageType.trim().isEmpty()) {
+            return Message.MessageType.TEXT;
+        }
+
+        try {
+            return Message.MessageType.valueOf(messageType.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid message type: {}, defaulting to TEXT", messageType);
+            return Message.MessageType.TEXT;
+        }
     }
 }

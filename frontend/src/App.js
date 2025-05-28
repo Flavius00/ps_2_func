@@ -11,6 +11,8 @@ import ProfilePage from './ProfilePage';
 import BuildingsPage from './BuildingsPage';
 import CreateSpacePage from './CreateSpacePage';
 import RentalContractPage from './RentalContractPage';
+import MessagesPage from './MessagesPage';
+import NotificationsPage from './NotificationsPage';
 
 function App() {
     const [user, setUser] = useState(() => {
@@ -44,6 +46,8 @@ function App() {
                 <Route path="/space-details/:id" element={user ? <SpaceDetailsPage /> : <Navigate to="/login" />} />
                 <Route path="/profile" element={user ? <ProfilePage /> : <Navigate to="/login" />} />
                 <Route path="/buildings" element={user ? <BuildingsPage /> : <Navigate to="/login" />} />
+                <Route path="/messages" element={user ? <MessagesPage /> : <Navigate to="/login" />} />
+                <Route path="/notifications" element={user ? <NotificationsPage /> : <Navigate to="/login" />} />
             </Routes>
         </Router>
     );
