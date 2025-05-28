@@ -135,43 +135,43 @@ function CreateSpacePage() {
             console.log('User:', user);
             console.log('Form data before processing:', formData);
 
-            // CRITICAL FIX: Create proper objects for owner and building
+            // CRITICAL FIX: Create proper data structure matching backend DTO
             const spaceData = {
                 name: formData.name,
                 description: formData.description,
-                area: formData.area,
-                pricePerMonth: formData.pricePerMonth,
+                area: parseFloat(formData.area) || 0,
+                pricePerMonth: parseFloat(formData.pricePerMonth) || 0,
                 address: formData.address,
-                latitude: formData.latitude,
-                longitude: formData.longitude,
+                latitude: parseFloat(formData.latitude) || 0,
+                longitude: parseFloat(formData.longitude) || 0,
                 spaceType: formData.spaceType,
                 available: formData.available,
-                amenities: formData.amenities,
-                // Type-specific fields
-                floors: formData.floors,
-                numberOfRooms: formData.numberOfRooms,
-                hasReception: formData.hasReception,
-                shopWindowSize: formData.shopWindowSize,
-                hasCustomerEntrance: formData.hasCustomerEntrance,
-                maxOccupancy: formData.maxOccupancy,
-                ceilingHeight: formData.ceilingHeight,
-                hasLoadingDock: formData.hasLoadingDock,
-                securityLevel: formData.securityLevel,
-                // CRITICAL FIX: Create proper owner and building objects
-                owner: {
-                    id: user.id
-                },
-                building: {
-                    id: parseInt(formData.buildingId)
-                }
+                amenities: formData.amenities || [],
+                // Type-specific fields (doar dacă au valori)
+                floors: formData.floors ? parseInt(formData.floors) : null,
+                numberOfRooms: formData.numberOfRooms ? parseInt(formData.numberOfRooms) : null,
+                hasReception: Boolean(formData.hasReception),
+                shopWindowSize: formData.shopWindowSize ? parseFloat(formData.shopWindowSize) : null,
+                hasCustomerEntrance: Boolean(formData.hasCustomerEntrance),
+                maxOccupancy: formData.maxOccupancy ? parseInt(formData.maxOccupancy) : null,
+                ceilingHeight: formData.ceilingHeight ? parseFloat(formData.ceilingHeight) : null,
+                hasLoadingDock: Boolean(formData.hasLoadingDock),
+                securityLevel: formData.securityLevel || 'MEDIUM',
+                // CRITICAL FIX: Send IDs directly instead of objects
+                ownerId: user.id,
+                buildingId: parseInt(formData.buildingId)
             };
 
             console.log('Space data to send:', spaceData);
-            console.log('Owner ID:', spaceData.owner.id);
-            console.log('Building ID:', spaceData.building.id);
+            console.log('Owner ID:', spaceData.ownerId);
+            console.log('Building ID:', spaceData.buildingId);
 
             // Send data to server
-            const response = await axios.post('http://localhost:8080/spaces/create', spaceData);
+            const response = await axios.post('http://localhost:8080/spaces/create', spaceData, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
             console.log('Space created successfully:', response.data);
             console.log('=== END CREATE SPACE FRONTEND DEBUG ===');
@@ -186,8 +186,21 @@ function CreateSpacePage() {
         } catch (error) {
             console.error('Eroare la crearea spațiului:', error);
             if (error.response) {
-                console.error('Server response:', error.response.data);
-                setError(`Nu s-a putut crea spațiul: ${error.response.data || 'Eroare nespecificată'}`);
+                console.error('Server response status:', error.response.status);
+                console.error('Server response data:', error.response.data);
+
+                // Handle validation errors
+                if (error.response.status === 400 && error.response.data.errors) {
+                    const validationErrors = error.response.data.errors;
+                    const errorMessages = Object.entries(validationErrors)
+                        .map(([field, message]) => `${field}: ${message}`)
+                        .join('\n');
+                    setError(`Erori de validare:\n${errorMessages}`);
+                } else if (error.response.data.message) {
+                    setError(`Nu s-a putut crea spațiul: ${error.response.data.message}`);
+                } else {
+                    setError(`Nu s-a putut crea spațiul: ${error.response.data || 'Eroare nespecificată'}`);
+                }
             } else {
                 setError('Nu s-a putut crea spațiul. Verificați datele introduse și încercați din nou.');
             }

@@ -1,5 +1,7 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.mapper.UserMapper;
+import com.example.demo.mapper.RentalContractMapper;
 import com.example.demo.model.RentalContract;
 import com.example.demo.model.User;
 import com.example.demo.repository.RentalContractRepository;
@@ -10,18 +12,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RentalContractRepository rentalContractRepository;
+    private final UserMapper userMapper;
+    private final RentalContractMapper contractMapper;
 
-    public UserServiceImpl(UserRepository userRepository, RentalContractRepository rentalContractRepository) {
+    public UserServiceImpl(UserRepository userRepository,
+                           RentalContractRepository rentalContractRepository,
+                           UserMapper userMapper,
+                           RentalContractMapper contractMapper) {
         this.userRepository = userRepository;
         this.rentalContractRepository = rentalContractRepository;
+        this.userMapper = userMapper;
+        this.contractMapper = contractMapper;
     }
 
+    // Metodele existente rămân neschimbate
     @Override
     public User addUser(User user) {
         if (userRepository.existsByUsername(user.getUsername())) {
@@ -52,7 +63,6 @@ public class UserServiceImpl implements UserService {
             throw new ResourceNotFoundException("User not found with id: " + user.getId());
         }
 
-        // Verifică dacă username-ul sau email-ul sunt deja folosite de alt utilizator
         User existingUserByUsername = userRepository.findByUsername(user.getUsername()).orElse(null);
         if (existingUserByUsername != null && !existingUserByUsername.getId().equals(user.getId())) {
             throw new IllegalArgumentException("Username already exists: " + user.getUsername());
@@ -83,7 +93,6 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public List<RentalContract> getUserContracts(Long userId) {
-        // Verifică dacă utilizatorul există
         if (!userRepository.existsById(userId)) {
             throw new ResourceNotFoundException("User not found with id: " + userId);
         }

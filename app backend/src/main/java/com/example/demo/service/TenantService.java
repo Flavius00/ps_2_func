@@ -20,4 +20,6 @@ public interface TenantService {
     Double getTenantMonthlyExpenses(Long tenantId);
     boolean hasActiveContractForSpace(Long tenantId, Long spaceId);
     List<Tenant> getTenantsWithActiveContracts();
+
+
 }

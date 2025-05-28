@@ -13,8 +13,9 @@ public interface UserService {
     User findByUsername(String username);
     List<RentalContract> getUserContracts(Long userId);
 
-    // Metode noi pentru JPA
+    // Metode existente pentru JPA
     List<User> getUsersByRole(User.UserRole role);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
+
 }

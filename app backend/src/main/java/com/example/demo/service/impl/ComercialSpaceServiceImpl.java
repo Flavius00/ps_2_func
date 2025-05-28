@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.mapper.ComercialSpaceMapper;
 import com.example.demo.model.ComercialSpace;
 import com.example.demo.model.Owner;
 import com.example.demo.model.Building;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -19,18 +21,18 @@ public class ComercialSpaceServiceImpl implements ComercialSpaceService {
     private final ComercialSpaceRepository spaceRepository;
     private final OwnerRepository ownerRepository;
     private final BuildingRepository buildingRepository;
+    private final ComercialSpaceMapper spaceMapper;
 
-    public ComercialSpaceServiceImpl(ComercialSpaceRepository spaceRepository,
-                                     OwnerRepository ownerRepository,
-                                     BuildingRepository buildingRepository) {
+    public ComercialSpaceServiceImpl(ComercialSpaceRepository spaceRepository, OwnerRepository ownerRepository, BuildingRepository buildingRepository, ComercialSpaceMapper spaceMapper) {
         this.spaceRepository = spaceRepository;
         this.ownerRepository = ownerRepository;
         this.buildingRepository = buildingRepository;
+        this.spaceMapper = spaceMapper;
     }
 
+    // Metodele existente rămân neschimbate
     @Override
     public ComercialSpace addSpace(ComercialSpace space) {
-        // CRITICIAL FIX: Validate and fetch owner and building
         if (space.getOwner() == null || space.getOwner().getId() == null) {
             throw new IllegalArgumentException("Owner is required for creating a space");
         }
@@ -39,14 +41,12 @@ public class ComercialSpaceServiceImpl implements ComercialSpaceService {
             throw new IllegalArgumentException("Building is required for creating a space");
         }
 
-        // Fetch the actual Owner and Building entities from database
         Owner owner = ownerRepository.findById(space.getOwner().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Owner not found with id: " + space.getOwner().getId()));
 
         Building building = buildingRepository.findById(space.getBuilding().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Building not found with id: " + space.getBuilding().getId()));
 
-        // Set the fully loaded entities
         space.setOwner(owner);
         space.setBuilding(building);
 
@@ -83,11 +83,9 @@ public class ComercialSpaceServiceImpl implements ComercialSpaceService {
             throw new ResourceNotFoundException("Commercial space not found with id: " + space.getId());
         }
 
-        // Get existing space to preserve owner and building relationships
         ComercialSpace existingSpace = spaceRepository.findById(space.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Commercial space not found with id: " + space.getId()));
 
-        // Preserve owner and building relationships if not provided in update
         if (space.getOwner() == null) {
             space.setOwner(existingSpace.getOwner());
         }

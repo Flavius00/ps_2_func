@@ -1,5 +1,8 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.mapper.UserMapper;
+import com.example.demo.mapper.ComercialSpaceMapper;
+import com.example.demo.mapper.RentalContractMapper;
 import com.example.demo.model.Tenant;
 import com.example.demo.model.ComercialSpace;
 import com.example.demo.model.RentalContract;
@@ -19,14 +22,23 @@ public class TenantServiceImpl implements TenantService {
 
     private final TenantRepository tenantRepository;
     private final RentalContractRepository contractRepository;
+    private final UserMapper userMapper;
+    private final ComercialSpaceMapper spaceMapper;
+    private final RentalContractMapper contractMapper;
 
     public TenantServiceImpl(TenantRepository tenantRepository,
-                             RentalContractRepository contractRepository) {
+                             RentalContractRepository contractRepository,
+                             UserMapper userMapper,
+                             ComercialSpaceMapper spaceMapper,
+                             RentalContractMapper contractMapper) {
         this.tenantRepository = tenantRepository;
         this.contractRepository = contractRepository;
+        this.userMapper = userMapper;
+        this.spaceMapper = spaceMapper;
+        this.contractMapper = contractMapper;
     }
 
-    // Metodele de bază pentru Tenant
+    // Metodele existente rămân neschimbate
     @Override
     public Tenant addTenant(Tenant tenant) {
         return tenantRepository.save(tenant);
@@ -59,7 +71,6 @@ public class TenantServiceImpl implements TenantService {
             throw new ResourceNotFoundException("Tenant not found with id: " + id);
         }
 
-        // Verifică dacă tenant-ul are contracte active
         long activeContractsCount = contractRepository.findActiveContractsByTenantId(id).size();
         if (activeContractsCount > 0) {
             throw new IllegalStateException("Cannot delete tenant with active contracts. " +
@@ -69,12 +80,6 @@ public class TenantServiceImpl implements TenantService {
         tenantRepository.deleteById(id);
     }
 
-    // Metodele pentru managementul contractelor și spațiilor
-    /**
-     * Obține toate spațiile închiriate de un tenant prin contractele active
-     * NOTA: Nu mai folosim tenant.getRentedSpaces() deoarece nu există asemenea listă în Tenant
-     * În schimb, obținem spațiile prin contractele active
-     */
     @Override
     @Transactional(readOnly = true)
     public List<ComercialSpace> getTenantRentedSpaces(Long tenantId) {
@@ -84,27 +89,18 @@ public class TenantServiceImpl implements TenantService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Obține toate contractele unui tenant
-     */
     @Override
     @Transactional(readOnly = true)
     public List<RentalContract> getTenantContracts(Long tenantId) {
         return contractRepository.findByTenantId(tenantId);
     }
 
-    /**
-     * Obține doar contractele active ale unui tenant
-     */
     @Override
     @Transactional(readOnly = true)
     public List<RentalContract> getTenantActiveContracts(Long tenantId) {
         return contractRepository.findActiveContractsByTenantId(tenantId);
     }
 
-    /**
-     * Calculează costul total lunar pentru un tenant
-     */
     @Override
     @Transactional(readOnly = true)
     public Double getTenantMonthlyExpenses(Long tenantId) {
@@ -114,9 +110,6 @@ public class TenantServiceImpl implements TenantService {
                 .sum();
     }
 
-    /**
-     * Verifică dacă un tenant are deja un contract activ pentru un anumit spațiu
-     */
     @Override
     @Transactional(readOnly = true)
     public boolean hasActiveContractForSpace(Long tenantId, Long spaceId) {
@@ -125,9 +118,6 @@ public class TenantServiceImpl implements TenantService {
                 .anyMatch(contract -> contract.getSpace().getId().equals(spaceId));
     }
 
-    /**
-     * Obține toți tenant-ii care au contracte active
-     */
     @Override
     @Transactional(readOnly = true)
     public List<Tenant> getTenantsWithActiveContracts() {

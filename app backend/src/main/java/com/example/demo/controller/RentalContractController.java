@@ -1,139 +1,171 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.RentalContractDto;
+import com.example.demo.dto.RentalContractCreateDto;
+import com.example.demo.mapper.RentalContractMapper;
 import com.example.demo.model.RentalContract;
-import com.example.demo.model.ComercialSpace;
-import com.example.demo.model.Tenant;
 import com.example.demo.service.RentalContractService;
-import com.example.demo.service.ComercialSpaceService;
-import com.example.demo.service.TenantService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/contracts")
 @CrossOrigin(origins = "http://localhost:3000")
 public class RentalContractController {
     private final RentalContractService contractService;
-    private final ComercialSpaceService spaceService;
-    private final TenantService tenantService;
+    private final RentalContractMapper contractMapper;
 
     public RentalContractController(RentalContractService contractService,
-                                    ComercialSpaceService spaceService,
-                                    TenantService tenantService) {
+                                    RentalContractMapper contractMapper) {
         this.contractService = contractService;
-        this.spaceService = spaceService;
-        this.tenantService = tenantService;
+        this.contractMapper = contractMapper;
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<RentalContractDto> updateContract(@PathVariable("id") Long id, @RequestBody RentalContractDto contractDto) {
+        try {
+            contractDto.setId(id);
+            RentalContract contract = contractMapper.toEntity(contractDto);
+            RentalContract updatedContract = contractService.updateContract(contract);
+            RentalContractDto responseDto = contractMapper.toDto(updatedContract);
+            return ResponseEntity.ok(responseDto);
+        } catch (Exception e) {
+            System.err.println("Error updating contract: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(null);
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> terminateContract(@PathVariable("id") Long id) {
+        try {
+            contractService.terminateContract(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            System.err.println("Error terminating contract: " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/tenant/{tenantId}")
+    public ResponseEntity<List<RentalContractDto>> getTenantContracts(@PathVariable("tenantId") Long tenantId) {
+        try {
+            List<RentalContract> contracts = contractService.getContractsByTenant(tenantId);
+            List<RentalContractDto> contractDtos = contracts.stream()
+                    .map(contractMapper::toDto)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(contractDtos);
+        } catch (Exception e) {
+            System.err.println("Error getting tenant contracts: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    @GetMapping("/owner/{ownerId}")
+    public ResponseEntity<List<RentalContractDto>> getOwnerContracts(@PathVariable("ownerId") Long ownerId) {
+        try {
+            List<RentalContract> contracts = contractService.getContractsByOwner(ownerId);
+            List<RentalContractDto> contractDtos = contracts.stream()
+                    .map(contractMapper::toDto)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(contractDtos);
+        } catch (Exception e) {
+            System.err.println("Error getting owner contracts: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    @GetMapping("/space/{spaceId}")
+    public ResponseEntity<List<RentalContractDto>> getSpaceContracts(@PathVariable("spaceId") Long spaceId) {
+        try {
+            List<RentalContract> contracts = contractService.getContractsBySpace(spaceId);
+            List<RentalContractDto> contractDtos = contracts.stream()
+                    .map(contractMapper::toDto)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(contractDtos);
+        } catch (Exception e) {
+            System.err.println("Error getting space contracts: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<RentalContractDto>> getContractsByStatus(@PathVariable("status") String status) {
+        try {
+            List<RentalContract> contracts = contractService.getContractsByStatus(status);
+            List<RentalContractDto> contractDtos = contracts.stream()
+                    .map(contractMapper::toDto)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(contractDtos);
+        } catch (Exception e) {
+            System.err.println("Error getting contracts by status: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    @PostMapping("/{id}/renew")
+    public ResponseEntity<RentalContractDto> renewContract(@PathVariable("id") Long id, @RequestBody RentalContractDto renewalDetails) {
+        try {
+            RentalContract renewalContract = contractMapper.toEntity(renewalDetails);
+            RentalContract renewedContract = contractService.renewContract(id, renewalContract);
+            RentalContractDto responseDto = contractMapper.toDto(renewedContract);
+            return ResponseEntity.ok(responseDto);
+        } catch (Exception e) {
+            System.err.println("Error renewing contract: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(null);
+        }
     }
 
     @PostMapping("/create")
-    public ResponseEntity<?> createContract(@RequestBody Map<String, Object> contractData) {
+    public ResponseEntity<RentalContractDto> createContract(@RequestBody RentalContractCreateDto createDto) {
         try {
-            System.out.println("Received contract data: " + contractData);
+            System.out.println("Received contract create DTO: " + createDto);
 
-            // Extract space and tenant IDs from the request
-            Long spaceId = null;
-            Long tenantId = null;
-
-            // Handle space data
-            if (contractData.get("space") instanceof Map) {
-                Map<String, Object> spaceData = (Map<String, Object>) contractData.get("space");
-                spaceId = ((Number) spaceData.get("id")).longValue();
-            } else if (contractData.get("spaceId") != null) {
-                spaceId = ((Number) contractData.get("spaceId")).longValue();
+            if (createDto.getSpaceId() == null || createDto.getTenantId() == null) {
+                return ResponseEntity.badRequest().body(null);
             }
 
-            // Handle tenant data
-            if (contractData.get("tenant") instanceof Map) {
-                Map<String, Object> tenantData = (Map<String, Object>) contractData.get("tenant");
-                tenantId = ((Number) tenantData.get("id")).longValue();
-            } else if (contractData.get("tenantId") != null) {
-                tenantId = ((Number) contractData.get("tenantId")).longValue();
-            }
-
-            if (spaceId == null || tenantId == null) {
-                return ResponseEntity.badRequest().body("Space ID and Tenant ID are required");
-            }
-
-            // Fetch the actual entities
-            ComercialSpace space = spaceService.getSpaceById(spaceId);
-            Tenant tenant = tenantService.getTenantById(tenantId);
-
-            // Build the contract with the fetched entities
-            RentalContract contract = RentalContract.builder()
-                    .space(space)
-                    .tenant(tenant)
-                    .startDate(java.time.LocalDate.parse((String) contractData.get("startDate")))
-                    .endDate(java.time.LocalDate.parse((String) contractData.get("endDate")))
-                    .monthlyRent(((Number) contractData.get("monthlyRent")).doubleValue())
-                    .securityDeposit(contractData.get("securityDeposit") != null ?
-                            ((Number) contractData.get("securityDeposit")).doubleValue() : null)
-                    .status(RentalContract.ContractStatus.valueOf(
-                            (String) contractData.getOrDefault("status", "ACTIVE")))
-                    .isPaid((Boolean) contractData.getOrDefault("isPaid", false))
-                    .dateCreated(contractData.get("dateCreated") != null ?
-                            java.time.LocalDate.parse((String) contractData.get("dateCreated")) :
-                            java.time.LocalDate.now())
-                    .contractNumber((String) contractData.get("contractNumber"))
-                    .notes((String) contractData.get("notes"))
-                    .build();
+            // Convert DTO to entity using mapper
+            RentalContract contract = contractMapper.toEntity(createDto);
 
             RentalContract savedContract = contractService.createContract(contract);
-            return ResponseEntity.ok(savedContract);
+
+            // Convert back to DTO for response
+            RentalContractDto responseDto = contractMapper.toDto(savedContract);
+            return ResponseEntity.ok(responseDto);
 
         } catch (Exception e) {
             System.err.println("Error creating contract: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.internalServerError()
-                    .body("Failed to create contract: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(null);
         }
     }
 
     @GetMapping
-    public List<RentalContract> getAllContracts() {
-        return contractService.getAllContracts();
+    public ResponseEntity<List<RentalContractDto>> getAllContracts() {
+        try {
+            List<RentalContract> contracts = contractService.getAllContracts();
+            List<RentalContractDto> contractDtos = contracts.stream()
+                    .map(contractMapper::toDto)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(contractDtos);
+        } catch (Exception e) {
+            System.err.println("Error getting all contracts: " + e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     @GetMapping("/{id}")
-    public RentalContract getContractById(@PathVariable("id") Long id) {
-        return contractService.getContractById(id);
-    }
-
-    @PutMapping("/{id}")
-    public RentalContract updateContract(@PathVariable("id") Long id, @RequestBody RentalContract contract) {
-        contract.setId(id);
-        return contractService.updateContract(contract);
-    }
-
-    @DeleteMapping("/{id}")
-    public void terminateContract(@PathVariable("id") Long id) {
-        contractService.terminateContract(id);
-    }
-
-    @GetMapping("/tenant/{tenantId}")
-    public List<RentalContract> getTenantContracts(@PathVariable("tenantId") Long tenantId) {
-        return contractService.getContractsByTenant(tenantId);
-    }
-
-    @GetMapping("/owner/{ownerId}")
-    public List<RentalContract> getOwnerContracts(@PathVariable("ownerId") Long ownerId) {
-        return contractService.getContractsByOwner(ownerId);
-    }
-
-    @GetMapping("/space/{spaceId}")
-    public List<RentalContract> getSpaceContracts(@PathVariable("spaceId") Long spaceId) {
-        return contractService.getContractsBySpace(spaceId);
-    }
-
-    @GetMapping("/status/{status}")
-    public List<RentalContract> getContractsByStatus(@PathVariable("status") String status) {
-        return contractService.getContractsByStatus(status);
-    }
-
-    @PostMapping("/{id}/renew")
-    public RentalContract renewContract(@PathVariable("id") Long id, @RequestBody RentalContract renewalDetails) {
-        return contractService.renewContract(id, renewalDetails);
+    public ResponseEntity<RentalContractDto> getContractById(@PathVariable("id") Long id) {
+        try {
+            RentalContract contract = contractService.getContractById(id);
+            RentalContractDto contractDto = contractMapper.toDto(contract);
+            return ResponseEntity.ok(contractDto);
+        } catch (Exception e) {
+            System.err.println("Error getting contract by id: " + e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
     }
 }

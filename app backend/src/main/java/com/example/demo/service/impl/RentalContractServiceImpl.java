@@ -1,9 +1,12 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.mapper.RentalContractMapper;
 import com.example.demo.model.ComercialSpace;
 import com.example.demo.model.RentalContract;
+import com.example.demo.model.Tenant;
 import com.example.demo.repository.RentalContractRepository;
 import com.example.demo.repository.ComercialSpaceRepository;
+import com.example.demo.repository.TenantRepository;
 import com.example.demo.service.RentalContractService;
 import com.example.demo.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -11,40 +14,43 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class RentalContractServiceImpl implements RentalContractService {
     private final RentalContractRepository contractRepository;
     private final ComercialSpaceRepository spaceRepository;
+    private final TenantRepository tenantRepository;
+    private final RentalContractMapper contractMapper;
 
     public RentalContractServiceImpl(RentalContractRepository contractRepository,
-                                     ComercialSpaceRepository spaceRepository) {
+                                     ComercialSpaceRepository spaceRepository,
+                                     TenantRepository tenantRepository,
+                                     RentalContractMapper contractMapper) {
         this.contractRepository = contractRepository;
         this.spaceRepository = spaceRepository;
+        this.tenantRepository = tenantRepository;
+        this.contractMapper = contractMapper;
     }
 
+    // Metodele existente rămân neschimbate
     @Override
     public RentalContract createContract(RentalContract contract) {
-        // Generate a contract number if not provided
         if (contract.getContractNumber() == null || contract.getContractNumber().isEmpty()) {
             contract.setContractNumber("RENT-" + System.currentTimeMillis());
         }
 
-        // Set the creation date to now if not provided
         if (contract.getDateCreated() == null) {
             contract.setDateCreated(LocalDate.now());
         }
 
-        // Set default status to ACTIVE if not provided
         if (contract.getStatus() == null) {
             contract.setStatus(RentalContract.ContractStatus.ACTIVE);
         }
 
-        // Save the contract first
         RentalContract savedContract = contractRepository.save(contract);
 
-        // Mark the space as unavailable
         if (contract.getSpace() != null) {
             ComercialSpace space = contract.getSpace();
             space.setAvailable(false);
@@ -81,7 +87,6 @@ public class RentalContractServiceImpl implements RentalContractService {
         contract.setStatus(RentalContract.ContractStatus.TERMINATED);
         contractRepository.save(contract);
 
-        // Make the space available again
         if (contract.getSpace() != null) {
             ComercialSpace space = contract.getSpace();
             space.setAvailable(true);
@@ -122,7 +127,6 @@ public class RentalContractServiceImpl implements RentalContractService {
     public RentalContract renewContract(Long contractId, RentalContract renewalDetails) {
         RentalContract existingContract = getContractById(contractId);
 
-        // Create a new contract based on the existing one with new dates
         RentalContract newContract = RentalContract.builder()
                 .tenant(existingContract.getTenant())
                 .space(existingContract.getSpace())
@@ -140,7 +144,6 @@ public class RentalContractServiceImpl implements RentalContractService {
                 .notes(renewalDetails.getNotes())
                 .build();
 
-        // Mark old contract as expired
         existingContract.setStatus(RentalContract.ContractStatus.EXPIRED);
         contractRepository.save(existingContract);
 

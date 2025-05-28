@@ -25,15 +25,13 @@ public class ComercialSpace {
     private String description;
 
     @Column(nullable = false)
-    private Double area; // in square meters
+    private Double area;
 
     @Column(nullable = false)
     private Double pricePerMonth;
 
     private String address;
-
     private Double latitude;
-
     private Double longitude;
 
     @ElementCollection
@@ -42,55 +40,44 @@ public class ComercialSpace {
     private List<String> amenities;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean available = true;
 
-    // CRITIC: Relația cu Owner - IGNORĂ serializarea pentru a evita loop-uri
+    // Rest of the class remains the same...
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
-    @JsonIgnore // Evită serializarea directă a owner-ului
+    @JsonIgnore
     private Owner owner;
 
-    // CRITIC: Relația cu Building - IGNORĂ serializarea pentru a evita loop-uri
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "building_id")
-    @JsonIgnore // Evită serializarea directă a building-ului
+    @JsonIgnore
     private Building building;
 
-    // Cascadă pentru parking - salvează automat parking-ul când salvează space-ul
     @OneToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
     @JoinColumn(name = "parking_id")
     private Parking parking;
 
-    // Space type: OFFICE, RETAIL, WAREHOUSE
     @Enumerated(EnumType.STRING)
     private SpaceType spaceType;
 
-    // Office specific properties
     private Integer floors;
     private Integer numberOfRooms;
     private Boolean hasReception;
-
-    // Retail specific properties
     private Double shopWindowSize;
     private Boolean hasCustomerEntrance;
     private Integer maxOccupancy;
-
-    // Warehouse specific properties
     private Double ceilingHeight;
     private Boolean hasLoadingDock;
 
     @Enumerated(EnumType.STRING)
     private SecurityLevel securityLevel;
 
-    // CRITIC: Relația cu contractele - IGNORĂ serializarea pentru a evita loop-uri
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnore // Evită serializarea directă a contractelor
+    @JsonIgnore
     private List<RentalContract> contracts;
 
-    // ===== METODE HELPER PENTRU JSON =====
-    // Acestea returnează doar informațiile necesare fără a cauza loop-uri
-
-    // Informații despre Owner (fără referința circulară)
+    // Helper methods for JSON remain the same...
     @JsonProperty("ownerId")
     public Long getOwnerId() {
         return owner != null ? owner.getId() : null;
@@ -116,7 +103,6 @@ public class ComercialSpace {
         return owner != null ? owner.getCompanyName() : null;
     }
 
-    // Informații despre Building (fără referința circulară)
     @JsonProperty("buildingId")
     public Long getBuildingId() {
         return building != null ? building.getId() : null;
@@ -142,7 +128,6 @@ public class ComercialSpace {
         return building != null ? building.getYearBuilt() : null;
     }
 
-    // Informații despre contracte (doar count, fără lista completă)
     @JsonProperty("contractsCount")
     public Integer getContractsCount() {
         return contracts != null ? contracts.size() : 0;

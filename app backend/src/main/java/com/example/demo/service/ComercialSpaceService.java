@@ -14,7 +14,7 @@ public interface ComercialSpaceService {
     List<ComercialSpace> getSpacesByOwner(Long ownerId);
     List<ComercialSpace> getSpacesByBuilding(Long buildingId);
 
-    // Metode noi pentru JPA
+    // Metode existente pentru JPA
     List<ComercialSpace> searchSpaces(String keyword);
     List<ComercialSpace> getSpacesByPriceRange(Double minPrice, Double maxPrice);
     List<ComercialSpace> getSpacesByAreaRange(Double minArea, Double maxArea);

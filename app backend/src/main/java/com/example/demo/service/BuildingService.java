@@ -16,7 +16,7 @@ public interface BuildingService {
     List<Building> getBuildingsWithAvailableSpaces();
     long getSpaceCountByBuildingId(Long buildingId);
 
-    // ADĂUGATE: Metode pentru obținerea spațiilor unei clădiri
+    // Metode pentru obținerea spațiilor unei clădiri
     List<ComercialSpace> getBuildingSpaces(Long buildingId);
     List<ComercialSpace> getBuildingAvailableSpaces(Long buildingId);
     long getBuildingAvailableSpacesCount(Long buildingId);

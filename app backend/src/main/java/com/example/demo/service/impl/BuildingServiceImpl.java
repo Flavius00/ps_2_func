@@ -1,5 +1,7 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.mapper.BuildingMapper;
+import com.example.demo.mapper.ComercialSpaceMapper;
 import com.example.demo.model.Building;
 import com.example.demo.model.ComercialSpace;
 import com.example.demo.repository.BuildingRepository;
@@ -10,19 +12,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class BuildingServiceImpl implements BuildingService {
     private final BuildingRepository buildingRepository;
     private final ComercialSpaceRepository comercialSpaceRepository;
+    private final BuildingMapper buildingMapper;
+    private final ComercialSpaceMapper spaceMapper;
 
     public BuildingServiceImpl(BuildingRepository buildingRepository,
-                               ComercialSpaceRepository comercialSpaceRepository) {
+                               ComercialSpaceRepository comercialSpaceRepository,
+                               BuildingMapper buildingMapper,
+                               ComercialSpaceMapper spaceMapper) {
         this.buildingRepository = buildingRepository;
         this.comercialSpaceRepository = comercialSpaceRepository;
+        this.buildingMapper = buildingMapper;
+        this.spaceMapper = spaceMapper;
     }
 
+    // Metodele existente rămân neschimbate
     @Override
     public Building addBuilding(Building building) {
         return buildingRepository.save(building);
@@ -55,7 +65,6 @@ public class BuildingServiceImpl implements BuildingService {
             throw new ResourceNotFoundException("Building not found with id: " + id);
         }
 
-        // Verifică dacă clădirea are spații comerciale asociate
         long spacesCount = comercialSpaceRepository.countByBuildingId(id);
         if (spacesCount > 0) {
             throw new IllegalStateException("Cannot delete building with associated commercial spaces. " +
@@ -75,7 +84,6 @@ public class BuildingServiceImpl implements BuildingService {
         List<Building> byName = buildingRepository.findByNameContaining(keyword);
         List<Building> byAddress = buildingRepository.findByAddressContaining(keyword);
 
-        // Combină rezultatele și elimină duplicatele
         byName.addAll(byAddress);
         return byName.stream().distinct().toList();
     }
@@ -92,26 +100,21 @@ public class BuildingServiceImpl implements BuildingService {
         return buildingRepository.countSpacesByBuildingId(buildingId);
     }
 
-    // IMPLEMENTĂRILE NOILOR METODE pentru obținerea spațiilor unei clădiri
     @Override
     @Transactional(readOnly = true)
     public List<ComercialSpace> getBuildingSpaces(Long buildingId) {
-        // Verifică dacă clădirea există
         if (!buildingRepository.existsById(buildingId)) {
             throw new ResourceNotFoundException("Building not found with id: " + buildingId);
         }
-
         return comercialSpaceRepository.findByBuildingId(buildingId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ComercialSpace> getBuildingAvailableSpaces(Long buildingId) {
-        // Verifică dacă clădirea există
         if (!buildingRepository.existsById(buildingId)) {
             throw new ResourceNotFoundException("Building not found with id: " + buildingId);
         }
-
         return comercialSpaceRepository.findByBuildingIdAndAvailable(buildingId, true);
     }
 

@@ -15,8 +15,9 @@ public interface RentalContractService {
     List<RentalContract> getContractsByStatus(String status);
     RentalContract renewContract(Long contractId, RentalContract renewalDetails);
 
-    // Metode noi pentru JPA
+    // Metode existente pentru JPA
     List<RentalContract> getExpiredContracts();
     List<RentalContract> getContractsExpiringInDays(int days);
     Double getTotalActiveMonthlyRevenue();
+
 }

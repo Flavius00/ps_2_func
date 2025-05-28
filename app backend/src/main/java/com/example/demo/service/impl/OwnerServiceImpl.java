@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.mapper.UserMapper;
 import com.example.demo.model.Owner;
 import com.example.demo.model.ComercialSpace;
 import com.example.demo.repository.OwnerRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -17,14 +19,17 @@ public class OwnerServiceImpl implements OwnerService {
 
     private final OwnerRepository ownerRepository;
     private final ComercialSpaceRepository spaceRepository;
+    private final UserMapper userMapper;
 
     public OwnerServiceImpl(OwnerRepository ownerRepository,
-                            ComercialSpaceRepository spaceRepository) {
+                            ComercialSpaceRepository spaceRepository,
+                            UserMapper userMapper) {
         this.ownerRepository = ownerRepository;
         this.spaceRepository = spaceRepository;
+        this.userMapper = userMapper;
     }
 
-    // Metodele de bază pentru Owner
+    // Metodele existente rămân neschimbate
     @Override
     public Owner addOwner(Owner owner) {
         return ownerRepository.save(owner);
@@ -57,7 +62,6 @@ public class OwnerServiceImpl implements OwnerService {
             throw new ResourceNotFoundException("Owner not found with id: " + id);
         }
 
-        // Verifică dacă proprietarul are spații comerciale asociate
         long spacesCount = spaceRepository.countByOwnerId(id);
         if (spacesCount > 0) {
             throw new IllegalStateException("Cannot delete owner with associated commercial spaces. " +
@@ -67,53 +71,34 @@ public class OwnerServiceImpl implements OwnerService {
         ownerRepository.deleteById(id);
     }
 
-    // Metodele pentru managementul spațiilor
-    /**
-     * Obține toate spațiile comerciale ale unui proprietar
-     * NOTA: Nu mai folosim owner.getSpaces() deoarece am eliminat lista din Owner
-     * În schimb, folosim query invers prin ComercialSpaceRepository
-     */
     @Override
     @Transactional(readOnly = true)
     public List<ComercialSpace> getOwnerSpaces(Long ownerId) {
         return spaceRepository.findByOwnerId(ownerId);
     }
 
-    /**
-     * Obține doar spațiile disponibile ale unui proprietar
-     */
     @Override
     @Transactional(readOnly = true)
     public List<ComercialSpace> getOwnerAvailableSpaces(Long ownerId) {
         return spaceRepository.findAvailableSpacesByOwnerId(ownerId);
     }
 
-    /**
-     * Obține numărul total de spații ale unui proprietar
-     */
     @Override
     @Transactional(readOnly = true)
     public long getOwnerSpacesCount(Long ownerId) {
         return spaceRepository.countByOwnerId(ownerId);
     }
 
-    /**
-     * Obține veniturile totale lunare ale unui proprietar din spațiile închiriate
-     * NOTA: Calculăm pe baza spațiilor obținute prin query, nu prin owner.getSpaces()
-     */
     @Override
     @Transactional(readOnly = true)
     public Double getOwnerMonthlyRevenue(Long ownerId) {
         return spaceRepository.findByOwnerId(ownerId)
                 .stream()
-                .filter(space -> !space.getAvailable()) // doar spațiile închiriate
+                .filter(space -> !space.getAvailable())
                 .mapToDouble(ComercialSpace::getPricePerMonth)
                 .sum();
     }
 
-    /**
-     * Obține proprietarii care au spații disponibile
-     */
     @Override
     @Transactional(readOnly = true)
     public List<Owner> getOwnersWithAvailableSpaces() {

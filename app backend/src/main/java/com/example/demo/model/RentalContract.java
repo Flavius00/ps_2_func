@@ -19,16 +19,14 @@ public class RentalContract {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // CRITIC: Relația cu Space - IGNORĂ serializarea pentru a evita loop-uri
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "space_id", nullable = false)
-    @JsonIgnore // Evită serializarea directă a space-ului
+    @JsonIgnore
     private ComercialSpace space;
 
-    // CRITIC: Relația cu Tenant - IGNORĂ serializarea pentru a evita loop-uri
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
-    @JsonIgnore // Evită serializarea directă a tenant-ului
+    @JsonIgnore
     private Tenant tenant;
 
     @DateTimeFormat(pattern = "yyyy-MM-dd")
@@ -46,9 +44,11 @@ public class RentalContract {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private ContractStatus status = ContractStatus.ACTIVE;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean isPaid = false;
 
     @DateTimeFormat(pattern = "yyyy-MM-dd")
@@ -60,10 +60,7 @@ public class RentalContract {
     @Column(length = 1000)
     private String notes;
 
-    // ===== METODE HELPER PENTRU JSON =====
-    // Acestea returnează doar informațiile necesare fără a cauza loop-uri
-
-    // Informații despre Space (fără referința circulară)
+    // All the JSON helper methods remain the same...
     @JsonProperty("spaceId")
     public Long getSpaceId() {
         return space != null ? space.getId() : null;
@@ -90,7 +87,6 @@ public class RentalContract {
                 space.getSpaceType().toString() : null;
     }
 
-    // Informații despre Tenant (fără referința circulară)
     @JsonProperty("tenantId")
     public Long getTenantId() {
         return tenant != null ? tenant.getId() : null;
@@ -116,7 +112,6 @@ public class RentalContract {
         return tenant != null ? tenant.getCompanyName() : null;
     }
 
-    // Informații despre Owner prin Space (fără referința circulară)
     @JsonProperty("ownerId")
     public Long getOwnerId() {
         return space != null && space.getOwner() != null ?
@@ -135,7 +130,6 @@ public class RentalContract {
                 space.getOwner().getEmail() : null;
     }
 
-    // Informații despre Building prin Space (fără referința circulară)
     @JsonProperty("buildingId")
     public Long getBuildingId() {
         return space != null && space.getBuilding() != null ?
