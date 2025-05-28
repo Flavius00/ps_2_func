@@ -39,6 +39,7 @@ public class UserController {
             return ResponseEntity.ok(responseDto);
         } catch (Exception e) {
             System.err.println("Error adding user: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -53,6 +54,7 @@ public class UserController {
             return ResponseEntity.ok(userDtos);
         } catch (Exception e) {
             System.err.println("Error getting all users: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.ok(List.of());
         }
     }
@@ -64,6 +66,7 @@ public class UserController {
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             System.err.println("Error deleting user: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -82,6 +85,7 @@ public class UserController {
             return ResponseEntity.ok(List.of());
         } catch (Exception e) {
             System.err.println("Error getting user contracts: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.ok(List.of());
         }
     }
@@ -94,6 +98,7 @@ public class UserController {
             return ResponseEntity.ok(userDto);
         } catch (Exception e) {
             System.err.println("Error getting user by id: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.notFound().build();
         }
     }
@@ -112,32 +117,57 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         } catch (Exception e) {
             System.err.println("Error during login: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
     }
 
+    // FIXED: Update user endpoint with better error handling
     @PutMapping("/update/{id}")
     public ResponseEntity<UserDto> updateUser(@PathVariable("id") Long id, @RequestBody UserDto updatedUserDto) {
         try {
-            User user = userService.getUserById(id);
-            if (user == null) {
+            System.out.println("=== UPDATE USER DEBUG ===");
+            System.out.println("User ID: " + id);
+            System.out.println("Request body: " + updatedUserDto);
+
+            // Verifică dacă utilizatorul există
+            User existingUser = userService.getUserById(id);
+            if (existingUser == null) {
+                System.err.println("User not found with id: " + id);
                 return ResponseEntity.notFound().build();
             }
 
-            // Map DTO to entity for update
-            User updatedUser = userMapper.toEntity(updatedUserDto);
-            updatedUser.setId(id);
+            System.out.println("Existing user: " + existingUser.getName());
 
-            // Preserve some fields that shouldn't be updated via this endpoint
-            updatedUser.setUsername(user.getUsername());
-            updatedUser.setPassword(user.getPassword());
-            updatedUser.setRole(user.getRole());
+            // Actualizează doar câmpurile permise
+            existingUser.setName(updatedUserDto.getName());
+            existingUser.setEmail(updatedUserDto.getEmail());
+            existingUser.setPhone(updatedUserDto.getPhone());
+            existingUser.setAddress(updatedUserDto.getAddress());
 
-            User savedUser = userService.updateUser(updatedUser);
+            // NU actualiza username, password, sau role prin acest endpoint
+            // acestea rămân neschimbate
+
+            System.out.println("Updated user data before save: " + existingUser.getName());
+
+            User savedUser = userService.updateUser(existingUser);
+
+            System.out.println("User saved successfully: " + savedUser.getName());
+
             UserDto responseDto = userMapper.toDto(savedUser);
+
+            System.out.println("Response DTO: " + responseDto);
+            System.out.println("=== END UPDATE USER DEBUG ===");
+
             return ResponseEntity.ok(responseDto);
+
+        } catch (IllegalArgumentException e) {
+            System.err.println("Validation error updating user: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             System.err.println("Error updating user: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }

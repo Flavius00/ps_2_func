@@ -7,53 +7,155 @@ import com.example.demo.model.ComercialSpace;
 import com.example.demo.model.Tenant;
 import com.example.demo.repository.ComercialSpaceRepository;
 import com.example.demo.repository.TenantRepository;
-import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
-@Mapper(componentModel = "spring")
-public abstract class RentalContractMapper {
+import java.time.LocalDate;
+
+@Component
+public class RentalContractMapper {
 
     @Autowired
-    protected ComercialSpaceRepository spaceRepository;
+    private ComercialSpaceRepository spaceRepository;
 
     @Autowired
-    protected TenantRepository tenantRepository;
+    private TenantRepository tenantRepository;
 
-    // Entity to DTO mapping - folosește expresii Java pentru nested properties
-    @Mapping(target = "spaceId", expression = "java(entity.getSpace() != null ? entity.getSpace().getId() : null)")
-    @Mapping(target = "spaceName", expression = "java(entity.getSpace() != null ? entity.getSpace().getName() : null)")
-    @Mapping(target = "spaceAddress", expression = "java(entity.getSpace() != null ? entity.getSpace().getAddress() : null)")
-    @Mapping(target = "spaceArea", expression = "java(entity.getSpace() != null ? entity.getSpace().getArea() : null)")
-    @Mapping(target = "spaceType", expression = "java(entity.getSpace() != null && entity.getSpace().getSpaceType() != null ? entity.getSpace().getSpaceType().name() : null)")
-    @Mapping(target = "tenantId", expression = "java(entity.getTenant() != null ? entity.getTenant().getId() : null)")
-    @Mapping(target = "tenantName", expression = "java(entity.getTenant() != null ? entity.getTenant().getName() : null)")
-    @Mapping(target = "tenantEmail", expression = "java(entity.getTenant() != null ? entity.getTenant().getEmail() : null)")
-    @Mapping(target = "tenantPhone", expression = "java(entity.getTenant() != null ? entity.getTenant().getPhone() : null)")
-    @Mapping(target = "tenantCompanyName", expression = "java(entity.getTenant() != null ? entity.getTenant().getCompanyName() : null)")
-    @Mapping(target = "ownerId", expression = "java(entity.getSpace() != null && entity.getSpace().getOwner() != null ? entity.getSpace().getOwner().getId() : null)")
-    @Mapping(target = "ownerName", expression = "java(entity.getSpace() != null && entity.getSpace().getOwner() != null ? entity.getSpace().getOwner().getName() : null)")
-    @Mapping(target = "ownerEmail", expression = "java(entity.getSpace() != null && entity.getSpace().getOwner() != null ? entity.getSpace().getOwner().getEmail() : null)")
-    @Mapping(target = "buildingId", expression = "java(entity.getSpace() != null && entity.getSpace().getBuilding() != null ? entity.getSpace().getBuilding().getId() : null)")
-    @Mapping(target = "buildingName", expression = "java(entity.getSpace() != null && entity.getSpace().getBuilding() != null ? entity.getSpace().getBuilding().getName() : null)")
-    @Mapping(target = "status", expression = "java(entity.getStatus() != null ? entity.getStatus().name() : null)")
-    public abstract RentalContractDto toDto(RentalContract entity);
+    public RentalContractDto toDto(RentalContract entity) {
+        if (entity == null) {
+            return null;
+        }
 
-    // Create DTO to Entity mapping
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "space", expression = "java(spaceIdToSpace(createDto.getSpaceId()))")
-    @Mapping(target = "tenant", expression = "java(tenantIdToTenant(createDto.getTenantId()))")
-    @Mapping(target = "status", expression = "java(stringToContractStatus(createDto.getStatus()))")
-    @Mapping(target = "dateCreated", expression = "java(createDto.getDateCreated() != null ? createDto.getDateCreated() : java.time.LocalDate.now())")
-    public abstract RentalContract toEntity(RentalContractCreateDto createDto);
+        RentalContractDto dto = new RentalContractDto();
 
-    // Full DTO to Entity mapping (for updates)
-    @Mapping(target = "space", expression = "java(spaceIdToSpace(dto.getSpaceId()))")
-    @Mapping(target = "tenant", expression = "java(tenantIdToTenant(dto.getTenantId()))")
-    @Mapping(target = "status", expression = "java(stringToContractStatus(dto.getStatus()))")
-    public abstract RentalContract toEntity(RentalContractDto dto);
+        // Basic properties
+        dto.setId(entity.getId());
+        dto.setStartDate(entity.getStartDate());
+        dto.setEndDate(entity.getEndDate());
+        dto.setMonthlyRent(entity.getMonthlyRent());
+        dto.setSecurityDeposit(entity.getSecurityDeposit());
+        dto.setIsPaid(entity.getIsPaid());
+        dto.setDateCreated(entity.getDateCreated());
+        dto.setContractNumber(entity.getContractNumber());
+        dto.setNotes(entity.getNotes());
+
+        // Status
+        if (entity.getStatus() != null) {
+            dto.setStatus(entity.getStatus().name());
+        }
+
+        // Space information
+        if (entity.getSpace() != null) {
+            dto.setSpaceId(entity.getSpace().getId());
+            dto.setSpaceName(entity.getSpace().getName());
+            dto.setSpaceAddress(entity.getSpace().getAddress());
+            dto.setSpaceArea(entity.getSpace().getArea());
+            if (entity.getSpace().getSpaceType() != null) {
+                dto.setSpaceType(entity.getSpace().getSpaceType().name());
+            }
+
+            // Owner information through space
+            if (entity.getSpace().getOwner() != null) {
+                dto.setOwnerId(entity.getSpace().getOwner().getId());
+                dto.setOwnerName(entity.getSpace().getOwner().getName());
+                dto.setOwnerEmail(entity.getSpace().getOwner().getEmail());
+            }
+
+            // Building information through space
+            if (entity.getSpace().getBuilding() != null) {
+                dto.setBuildingId(entity.getSpace().getBuilding().getId());
+                dto.setBuildingName(entity.getSpace().getBuilding().getName());
+            }
+        }
+
+        // Tenant information
+        if (entity.getTenant() != null) {
+            dto.setTenantId(entity.getTenant().getId());
+            dto.setTenantName(entity.getTenant().getName());
+            dto.setTenantEmail(entity.getTenant().getEmail());
+            dto.setTenantPhone(entity.getTenant().getPhone());
+            dto.setTenantCompanyName(entity.getTenant().getCompanyName());
+        }
+
+        return dto;
+    }
+
+    public RentalContract toEntity(RentalContractCreateDto createDto) {
+        if (createDto == null) {
+            return null;
+        }
+
+        RentalContract entity = new RentalContract();
+
+        // Basic properties
+        entity.setStartDate(createDto.getStartDate());
+        entity.setEndDate(createDto.getEndDate());
+        entity.setMonthlyRent(createDto.getMonthlyRent());
+        entity.setSecurityDeposit(createDto.getSecurityDeposit());
+        entity.setIsPaid(createDto.getIsPaid());
+        entity.setContractNumber(createDto.getContractNumber());
+        entity.setNotes(createDto.getNotes());
+
+        // Set date created
+        if (createDto.getDateCreated() != null) {
+            entity.setDateCreated(createDto.getDateCreated());
+        } else {
+            entity.setDateCreated(LocalDate.now());
+        }
+
+        // Set status
+        if (createDto.getStatus() != null) {
+            entity.setStatus(stringToContractStatus(createDto.getStatus()));
+        } else {
+            entity.setStatus(RentalContract.ContractStatus.ACTIVE);
+        }
+
+        // Set space and tenant
+        if (createDto.getSpaceId() != null) {
+            entity.setSpace(spaceIdToSpace(createDto.getSpaceId()));
+        }
+
+        if (createDto.getTenantId() != null) {
+            entity.setTenant(tenantIdToTenant(createDto.getTenantId()));
+        }
+
+        return entity;
+    }
+
+    public RentalContract toEntity(RentalContractDto dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        RentalContract entity = new RentalContract();
+
+        entity.setId(dto.getId());
+        entity.setStartDate(dto.getStartDate());
+        entity.setEndDate(dto.getEndDate());
+        entity.setMonthlyRent(dto.getMonthlyRent());
+        entity.setSecurityDeposit(dto.getSecurityDeposit());
+        entity.setIsPaid(dto.getIsPaid());
+        entity.setDateCreated(dto.getDateCreated());
+        entity.setContractNumber(dto.getContractNumber());
+        entity.setNotes(dto.getNotes());
+
+        if (dto.getStatus() != null) {
+            entity.setStatus(stringToContractStatus(dto.getStatus()));
+        }
+
+        if (dto.getSpaceId() != null) {
+            entity.setSpace(spaceIdToSpace(dto.getSpaceId()));
+        }
+
+        if (dto.getTenantId() != null) {
+            entity.setTenant(tenantIdToTenant(dto.getTenantId()));
+        }
+
+        return entity;
+    }
 
     // Helper methods
-    protected ComercialSpace spaceIdToSpace(Long spaceId) {
+    private ComercialSpace spaceIdToSpace(Long spaceId) {
         if (spaceId == null) {
             return null;
         }
@@ -61,7 +163,7 @@ public abstract class RentalContractMapper {
                 .orElseThrow(() -> new RuntimeException("Space not found with id: " + spaceId));
     }
 
-    protected Tenant tenantIdToTenant(Long tenantId) {
+    private Tenant tenantIdToTenant(Long tenantId) {
         if (tenantId == null) {
             return null;
         }
@@ -69,14 +171,14 @@ public abstract class RentalContractMapper {
                 .orElseThrow(() -> new RuntimeException("Tenant not found with id: " + tenantId));
     }
 
-    protected RentalContract.ContractStatus stringToContractStatus(String status) {
+    private RentalContract.ContractStatus stringToContractStatus(String status) {
         if (status == null) {
-            return RentalContract.ContractStatus.ACTIVE; // default value
+            return RentalContract.ContractStatus.ACTIVE;
         }
         try {
             return RentalContract.ContractStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return RentalContract.ContractStatus.ACTIVE; // default value
+            return RentalContract.ContractStatus.ACTIVE;
         }
     }
 }

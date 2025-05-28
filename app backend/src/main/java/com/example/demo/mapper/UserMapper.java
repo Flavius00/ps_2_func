@@ -2,28 +2,61 @@ package com.example.demo.mapper;
 
 import com.example.demo.dto.UserDto;
 import com.example.demo.model.User;
-import org.mapstruct.*;
+import org.springframework.stereotype.Component;
 
-@Mapper(componentModel = "spring")
-public interface UserMapper {
+@Component
+public class UserMapper {
 
-    // Entity to DTO mapping
-    @Mapping(target = "role", expression = "java(entity.getRole() != null ? entity.getRole().name() : null)")
-    UserDto toDto(User entity);
+    public UserDto toDto(User entity) {
+        if (entity == null) {
+            return null;
+        }
 
-    // DTO to Entity mapping
-    @Mapping(target = "role", expression = "java(stringToRole(dto.getRole()))")
-    User toEntity(UserDto dto);
+        UserDto dto = new UserDto();
+        dto.setId(entity.getId());
+        dto.setName(entity.getName());
+        dto.setEmail(entity.getEmail());
+        dto.setUsername(entity.getUsername());
+        dto.setPhone(entity.getPhone());
+        dto.setAddress(entity.getAddress());
+        dto.setProfilePictureUrl(entity.getProfilePictureUrl());
 
-    // Helper method pentru conversie role
-    default User.UserRole stringToRole(String role) {
+        if (entity.getRole() != null) {
+            dto.setRole(entity.getRole().name());
+        }
+
+        return dto;
+    }
+
+    public User toEntity(UserDto dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        User entity = new User();
+        entity.setId(dto.getId());
+        entity.setName(dto.getName());
+        entity.setEmail(dto.getEmail());
+        entity.setUsername(dto.getUsername());
+        entity.setPhone(dto.getPhone());
+        entity.setAddress(dto.getAddress());
+        entity.setProfilePictureUrl(dto.getProfilePictureUrl());
+
+        if (dto.getRole() != null) {
+            entity.setRole(stringToRole(dto.getRole()));
+        }
+
+        return entity;
+    }
+
+    private User.UserRole stringToRole(String role) {
         if (role == null) {
-            return User.UserRole.TENANT; // default value
+            return User.UserRole.TENANT;
         }
         try {
             return User.UserRole.valueOf(role.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return User.UserRole.TENANT; // default value
+            return User.UserRole.TENANT;
         }
     }
 }

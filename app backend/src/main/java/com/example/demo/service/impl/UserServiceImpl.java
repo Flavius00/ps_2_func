@@ -32,7 +32,6 @@ public class UserServiceImpl implements UserService {
         this.contractMapper = contractMapper;
     }
 
-    // Metodele existente rămân neschimbate
     @Override
     public User addUser(User user) {
         if (userRepository.existsByUsername(user.getUsername())) {
@@ -59,21 +58,42 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User updateUser(User user) {
-        if (!userRepository.existsById(user.getId())) {
-            throw new ResourceNotFoundException("User not found with id: " + user.getId());
-        }
+        try {
+            System.out.println("=== UserService.updateUser DEBUG ===");
+            System.out.println("Updating user with ID: " + user.getId());
 
-        User existingUserByUsername = userRepository.findByUsername(user.getUsername()).orElse(null);
-        if (existingUserByUsername != null && !existingUserByUsername.getId().equals(user.getId())) {
-            throw new IllegalArgumentException("Username already exists: " + user.getUsername());
-        }
+            if (!userRepository.existsById(user.getId())) {
+                throw new ResourceNotFoundException("User not found with id: " + user.getId());
+            }
 
-        User existingUserByEmail = userRepository.findByEmail(user.getEmail()).orElse(null);
-        if (existingUserByEmail != null && !existingUserByEmail.getId().equals(user.getId())) {
-            throw new IllegalArgumentException("Email already exists: " + user.getEmail());
-        }
+            // Verifică dacă username-ul nu este deja folosit de alt utilizator
+            if (user.getUsername() != null) {
+                User existingUserByUsername = userRepository.findByUsername(user.getUsername()).orElse(null);
+                if (existingUserByUsername != null && !existingUserByUsername.getId().equals(user.getId())) {
+                    throw new IllegalArgumentException("Username already exists: " + user.getUsername());
+                }
+            }
 
-        return userRepository.save(user);
+            // Verifică dacă email-ul nu este deja folosit de alt utilizator
+            if (user.getEmail() != null) {
+                User existingUserByEmail = userRepository.findByEmail(user.getEmail()).orElse(null);
+                if (existingUserByEmail != null && !existingUserByEmail.getId().equals(user.getId())) {
+                    throw new IllegalArgumentException("Email already exists: " + user.getEmail());
+                }
+            }
+
+            System.out.println("Saving user: " + user.getName());
+            User savedUser = userRepository.save(user);
+            System.out.println("User saved successfully with ID: " + savedUser.getId());
+            System.out.println("=== END UserService.updateUser DEBUG ===");
+
+            return savedUser;
+
+        } catch (Exception e) {
+            System.err.println("Error in UserService.updateUser: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     @Override

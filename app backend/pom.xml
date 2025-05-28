@@ -47,21 +47,6 @@
 			<artifactId>hibernate-validator</artifactId>
 			<version>8.0.0.Final</version>
 		</dependency>
-		<!-- MapStruct for mapping DTOs -->
-		<dependency>
-			<groupId>org.mapstruct</groupId>
-			<artifactId>mapstruct</artifactId>
-			<version>1.5.5.Final</version>
-		</dependency>
-
-		<!-- MapStruct processor for compile-time generation -->
-		<dependency>
-			<groupId>org.mapstruct</groupId>
-			<artifactId>mapstruct-processor</artifactId>
-			<version>1.5.5.Final</version>
-			<scope>provided</scope>
-		</dependency>
-
 
 		<!-- Jakarta Validation API -->
 		<dependency>
@@ -69,7 +54,6 @@
 			<artifactId>jakarta.validation-api</artifactId>
 			<version>3.0.2</version>
 		</dependency>
-
 
 		<!-- MySQL Connector pentru MySQL 8.0+ -->
 		<dependency>
