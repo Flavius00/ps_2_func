@@ -7,6 +7,8 @@ import com.example.demo.mapper.RentalContractMapper;
 import com.example.demo.model.User;
 import com.example.demo.model.RentalContract;
 import com.example.demo.service.UserService;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestController
 @RequestMapping("/users")
 @CrossOrigin(origins = "http://localhost:3000")
@@ -31,144 +34,148 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<UserDto> addUser(@RequestBody UserDto userDto) {
-        try {
-            User user = userMapper.toEntity(userDto);
-            User savedUser = userService.addUser(user);
-            UserDto responseDto = userMapper.toDto(savedUser);
-            return ResponseEntity.ok(responseDto);
-        } catch (Exception e) {
-            System.err.println("Error adding user: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
-        }
+    public ResponseEntity<UserDto> addUser(@Valid @RequestBody UserDto userDto) {
+        log.info("Creating new user: {}", userDto.getUsername());
+
+        User user = userMapper.toEntity(userDto);
+        User savedUser = userService.addUser(user);
+        UserDto responseDto = userMapper.toDto(savedUser);
+
+        log.info("Successfully created user with ID: {}", savedUser.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
     }
 
     @GetMapping
     public ResponseEntity<List<UserDto>> getAllUsers() {
-        try {
-            List<User> users = userService.getAllUsers();
-            List<UserDto> userDtos = users.stream()
-                    .map(userMapper::toDto)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(userDtos);
-        } catch (Exception e) {
-            System.err.println("Error getting all users: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.ok(List.of());
-        }
+        log.info("Fetching all users");
+
+        List<User> users = userService.getAllUsers();
+        List<UserDto> userDtos = users.stream()
+                .map(userMapper::toDto)
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} users", userDtos.size());
+        return ResponseEntity.ok(userDtos);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<UserDto> getUserById(@PathVariable Long id) {
+        log.info("Fetching user with ID: {}", id);
+
+        User user = userService.getUserById(id);
+        UserDto userDto = userMapper.toDto(user);
+
+        log.info("Successfully retrieved user: {}", user.getUsername());
+        return ResponseEntity.ok(userDto);
+    }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<UserDto> updateUser(
+            @PathVariable Long id,
+            @Valid @RequestBody UserDto updatedUserDto) {
+
+        log.info("Updating user with ID: {}", id);
+
+        // Get existing user to preserve certain fields
+        User existingUser = userService.getUserById(id);
+
+        // Update only allowed fields
+        existingUser.setName(updatedUserDto.getName());
+        existingUser.setEmail(updatedUserDto.getEmail());
+        existingUser.setPhone(updatedUserDto.getPhone());
+        existingUser.setAddress(updatedUserDto.getAddress());
+
+        User savedUser = userService.updateUser(existingUser);
+        UserDto responseDto = userMapper.toDto(savedUser);
+
+        log.info("Successfully updated user: {}", savedUser.getUsername());
+        return ResponseEntity.ok(responseDto);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable("id") Long id) {
-        try {
-            userService.deleteUser(id);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            System.err.println("Error deleting user: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
-        }
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        log.info("Deleting user with ID: {}", id);
+
+        userService.deleteUser(id);
+
+        log.info("Successfully deleted user with ID: {}", id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/contracts")
     public ResponseEntity<List<RentalContractDto>> getUserContracts(@PathVariable Long id) {
-        try {
-            User user = userService.getUserById(id);
-            if (user.getRole() == User.UserRole.TENANT) {
-                List<RentalContract> contracts = userService.getUserContracts(id);
-                List<RentalContractDto> contractDtos = contracts.stream()
-                        .map(contractMapper::toDto)
-                        .collect(Collectors.toList());
-                return ResponseEntity.ok(contractDtos);
-            }
-            return ResponseEntity.ok(List.of());
-        } catch (Exception e) {
-            System.err.println("Error getting user contracts: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.ok(List.of());
-        }
-    }
+        log.info("Fetching contracts for user ID: {}", id);
 
-    @GetMapping("/{id}")
-    public ResponseEntity<UserDto> getUserById(@PathVariable("id") Long id) {
-        try {
-            User user = userService.getUserById(id);
-            UserDto userDto = userMapper.toDto(user);
-            return ResponseEntity.ok(userDto);
-        } catch (Exception e) {
-            System.err.println("Error getting user by id: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.notFound().build();
+        User user = userService.getUserById(id);
+        if (user.getRole() == User.UserRole.TENANT) {
+            List<RentalContract> contracts = userService.getUserContracts(id);
+            List<RentalContractDto> contractDtos = contracts.stream()
+                    .map(contractMapper::toDto)
+                    .collect(Collectors.toList());
+
+            log.info("Successfully retrieved {} contracts for user {}", contractDtos.size(), id);
+            return ResponseEntity.ok(contractDtos);
         }
+
+        log.info("User {} is not a tenant, returning empty contract list", id);
+        return ResponseEntity.ok(List.of());
     }
 
     @PostMapping("/api/users/login")
-    public ResponseEntity<UserDto> login(@RequestBody UserDto loginUserDto) {
+    public ResponseEntity<UserDto> login(@Valid @RequestBody UserDto loginUserDto) {
+        log.info("Login attempt for username: {}", loginUserDto.getUsername());
+
+        User loginUser = userMapper.toEntity(loginUserDto);
+        User user = userService.findByUsername(loginUser.getUsername());
+
+        if (user != null && user.getPassword().equals(loginUser.getPassword())) {
+            UserDto responseDto = userMapper.toDto(user);
+            log.info("Successful login for user: {}", user.getUsername());
+            return ResponseEntity.ok(responseDto);
+        }
+
+        log.warn("Failed login attempt for username: {}", loginUserDto.getUsername());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    @GetMapping("/role/{role}")
+    public ResponseEntity<List<UserDto>> getUsersByRole(@PathVariable String role) {
+        log.info("Fetching users by role: {}", role);
+
         try {
-            User loginUser = userMapper.toEntity(loginUserDto);
-            User user = userService.findByUsername(loginUser.getUsername());
+            User.UserRole userRole = User.UserRole.valueOf(role.toUpperCase());
+            List<User> users = userService.getUsersByRole(userRole);
+            List<UserDto> userDtos = users.stream()
+                    .map(userMapper::toDto)
+                    .collect(Collectors.toList());
 
-            if (user != null && user.getPassword().equals(loginUser.getPassword())) {
-                UserDto responseDto = userMapper.toDto(user);
-                return ResponseEntity.ok(responseDto);
-            }
+            log.info("Successfully retrieved {} users with role {}", userDtos.size(), role);
+            return ResponseEntity.ok(userDtos);
 
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        } catch (Exception e) {
-            System.err.println("Error during login: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid user role requested: {}", role);
+            throw new IllegalArgumentException("Invalid user role: " + role +
+                    ". Valid roles are: OWNER, TENANT, ADMIN");
         }
     }
 
-    // FIXED: Update user endpoint with better error handling
-    @PutMapping("/update/{id}")
-    public ResponseEntity<UserDto> updateUser(@PathVariable("id") Long id, @RequestBody UserDto updatedUserDto) {
-        try {
-            System.out.println("=== UPDATE USER DEBUG ===");
-            System.out.println("User ID: " + id);
-            System.out.println("Request body: " + updatedUserDto);
+    @GetMapping("/exists/username/{username}")
+    public ResponseEntity<Boolean> checkUsernameExists(@PathVariable String username) {
+        log.info("Checking if username exists: {}", username);
 
-            // Verifică dacă utilizatorul există
-            User existingUser = userService.getUserById(id);
-            if (existingUser == null) {
-                System.err.println("User not found with id: " + id);
-                return ResponseEntity.notFound().build();
-            }
+        boolean exists = userService.existsByUsername(username);
 
-            System.out.println("Existing user: " + existingUser.getName());
+        log.info("Username {} exists: {}", username, exists);
+        return ResponseEntity.ok(exists);
+    }
 
-            // Actualizează doar câmpurile permise
-            existingUser.setName(updatedUserDto.getName());
-            existingUser.setEmail(updatedUserDto.getEmail());
-            existingUser.setPhone(updatedUserDto.getPhone());
-            existingUser.setAddress(updatedUserDto.getAddress());
+    @GetMapping("/exists/email/{email}")
+    public ResponseEntity<Boolean> checkEmailExists(@PathVariable String email) {
+        log.info("Checking if email exists: {}", email);
 
-            // NU actualiza username, password, sau role prin acest endpoint
-            // acestea rămân neschimbate
+        boolean exists = userService.existsByEmail(email);
 
-            System.out.println("Updated user data before save: " + existingUser.getName());
-
-            User savedUser = userService.updateUser(existingUser);
-
-            System.out.println("User saved successfully: " + savedUser.getName());
-
-            UserDto responseDto = userMapper.toDto(savedUser);
-
-            System.out.println("Response DTO: " + responseDto);
-            System.out.println("=== END UPDATE USER DEBUG ===");
-
-            return ResponseEntity.ok(responseDto);
-
-        } catch (IllegalArgumentException e) {
-            System.err.println("Validation error updating user: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            System.err.println("Error updating user: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
-        }
+        log.info("Email {} exists: {}", email, exists);
+        return ResponseEntity.ok(exists);
     }
 }
