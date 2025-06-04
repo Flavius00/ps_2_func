@@ -3,6 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './RentalContractPage.css';
 
+// Import-uri pentru validare
+import { useFormValidation } from './hooks/useFormValidation';
+import { validateSignature, validateContractDuration, validateDateRange } from './utils/validation';
+import ValidatedInput from './components/forms/ValidatedInput';
+import ValidatedSelect from './components/forms/ValidatedSelect';
+
 // ============ STRATEGY PATTERN IMPLEMENTATION ============
 
 // Strategy interface
@@ -149,21 +155,52 @@ function RentalContractPage() {
     const [space, setSpace] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [contractDuration, setContractDuration] = useState(12);
-    const [termsAccepted, setTermsAccepted] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState('');
-    const [signatureData, setSignatureData] = useState('');
 
     // Strategy Pattern: Context și pricing
     const [pricingContext] = useState(new PricingContext());
     const [pricing, setPricing] = useState(null);
 
+    // Hook de validare pentru formularul de contract
+    const {
+        values: contractFormData,
+        errors: contractErrors,
+        touched,
+        isSubmitting: contractSubmitting,
+        handleChange: handleContractChange,
+        handleBlur: handleContractBlur,
+        validateAllFields: validateContractFields,
+        setSubmitting: setContractSubmitting
+    } = useFormValidation({
+        contractDuration: 12,
+        termsAccepted: false,
+        paymentMethod: '',
+        signatureData: ''
+    }, {
+        contractDuration: [validateContractDuration],
+        paymentMethod: [(method) => {
+            if (!method || method.trim() === '') {
+                return { isValid: false, message: 'Selectează o metodă de plată' };
+            }
+            const validMethods = ['card', 'transfer', 'cash'];
+            if (!validMethods.includes(method)) {
+                return { isValid: false, message: 'Metodă de plată invalidă' };
+            }
+            return { isValid: true, message: '' };
+        }],
+        signatureData: [validateSignature],
+        termsAccepted: [(accepted) => {
+            if (!accepted) {
+                return { isValid: false, message: 'Trebuie să accepți termenii și condițiile' };
+            }
+            return { isValid: true, message: '' };
+        }]
+    });
+
     const startDate = new Date();
     const formattedStartDate = startDate.toISOString().split('T')[0];
 
     const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + parseInt(contractDuration));
+    endDate.setMonth(endDate.getMonth() + parseInt(contractFormData.contractDuration));
     const formattedEndDate = endDate.toISOString().split('T')[0];
 
     useEffect(() => {
@@ -186,38 +223,20 @@ function RentalContractPage() {
 
     // Strategy Pattern: Recalculează prețurile când se schimbă durata
     useEffect(() => {
-        if (space && contractDuration) {
-            console.log(`💰 Calculating pricing for ${contractDuration} months`);
+        if (space && contractFormData.contractDuration) {
+            console.log(`💰 Calculating pricing for ${contractFormData.contractDuration} months`);
 
             // Creează și setează strategia
-            const strategy = PricingStrategyFactory.createStrategy(parseInt(contractDuration));
+            const strategy = PricingStrategyFactory.createStrategy(parseInt(contractFormData.contractDuration));
             pricingContext.setStrategy(strategy);
 
             // Calculează prețurile
-            const result = pricingContext.calculatePrice(space.pricePerMonth, parseInt(contractDuration));
+            const result = pricingContext.calculatePrice(space.pricePerMonth, parseInt(contractFormData.contractDuration));
             setPricing(result);
 
             console.log('📊 Pricing result:', result);
         }
-    }, [space, contractDuration, pricingContext]);
-
-    const handleContractDurationChange = (e) => {
-        const newDuration = e.target.value;
-        console.log(`📅 Duration changed from ${contractDuration} to ${newDuration} months`);
-        setContractDuration(newDuration);
-    };
-
-    const handleTermsAccepted = (e) => {
-        setTermsAccepted(e.target.checked);
-    };
-
-    const handlePaymentMethodChange = (e) => {
-        setPaymentMethod(e.target.value);
-    };
-
-    const handleSignatureChange = (e) => {
-        setSignatureData(e.target.value);
-    };
+    }, [space, contractFormData.contractDuration, pricingContext]);
 
     const handleCancel = () => {
         navigate('/spaces');
@@ -226,22 +245,20 @@ function RentalContractPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!termsAccepted) {
-            alert('Trebuie să acceptați termenii și condițiile contractului înainte de a continua.');
+        // Validează formularul de contract
+        if (!validateContractFields()) {
+            alert('Te rugăm să corectezi erorile din formular înainte de a continua.');
             return;
         }
 
-        if (!paymentMethod) {
-            alert('Vă rugăm să selectați o metodă de plată.');
+        // Validare suplimentară pentru date
+        const dateValidation = validateDateRange(formattedStartDate, formattedEndDate);
+        if (!dateValidation.isValid) {
+            alert(`Eroare la validarea datelor: ${dateValidation.message}`);
             return;
         }
 
-        if (!signatureData.trim()) {
-            alert('Vă rugăm să adăugați semnătura electronică.');
-            return;
-        }
-
-        setIsSubmitting(true);
+        setContractSubmitting(true);
 
         try {
             const contractData = {
@@ -255,7 +272,7 @@ function RentalContractPage() {
                 isPaid: true,
                 dateCreated: formattedStartDate,
                 contractNumber: `RENT-${Date.now()}`,
-                notes: `Contract încheiat electronic. Metodă de plată: ${paymentMethod}. Durata: ${contractDuration} luni. Discount aplicat: ${pricing.discount}%. Economii: ${pricing.discountAmount}€. Strategie folosită: ${pricing.strategyName}. Semnătură: ${signatureData}`
+                notes: `Contract încheiat electronic. Metodă de plată: ${contractFormData.paymentMethod}. Durata: ${contractFormData.contractDuration} luni. Discount aplicat: ${pricing.discount}%. Economii: ${pricing.discountAmount}€. Strategie folosită: ${pricing.strategyName}. Semnătură: ${contractFormData.signatureData}`
             };
 
             console.log('📝 Creating contract with pricing strategy data:', contractData);
@@ -297,8 +314,8 @@ function RentalContractPage() {
             const contractForConfirmation = {
                 ...contractData,
                 id: response.data.id,
-                paymentMethod: paymentMethod,
-                signature: signatureData,
+                paymentMethod: contractFormData.paymentMethod,
+                signature: contractFormData.signatureData,
                 appliedDiscount: pricing.discount,
                 savings: pricing.discountAmount,
                 strategyUsed: pricing.strategyName
@@ -337,7 +354,7 @@ function RentalContractPage() {
                 setError('A apărut o eroare neașteptată. Vă rugăm încercați din nou.');
             }
         } finally {
-            setIsSubmitting(false);
+            setContractSubmitting(false);
         }
     };
 
@@ -401,7 +418,7 @@ function RentalContractPage() {
                                 </p>
                                 {pricing.discount > 0 && (
                                     <p style={{color: '#27ae60', fontWeight: 'bold'}}>
-                                        4.1.1 S-a aplicat un discount de {pricing.discount}% pentru durata contractului de {contractDuration} luni,
+                                        4.1.1 S-a aplicat un discount de {pricing.discount}% pentru durata contractului de {contractFormData.contractDuration} luni,
                                         rezultând o economie totală de {pricing.discountAmount.toFixed(2)} Euro.
                                     </p>
                                 )}
@@ -482,21 +499,21 @@ function RentalContractPage() {
                         </div>
                         <div className="summary-item duration">
                             <span className="summary-label">Durată contract:</span>
-                            <select
-                                value={contractDuration}
-                                onChange={handleContractDurationChange}
-                                disabled={isSubmitting}
-                                style={{
-                                    padding: '8px',
-                                    borderRadius: '4px',
-                                    border: '2px solid #2196f3'
-                                }}
-                            >
-                                <option value="6">6 luni</option>
-                                <option value="12">12 luni</option>
-                                <option value="24">24 luni</option>
-                                <option value="36">36 luni</option>
-                            </select>
+                            <ValidatedSelect
+                                name="contractDuration"
+                                value={contractFormData.contractDuration}
+                                onChange={handleContractChange}
+                                onBlur={handleContractBlur}
+                                error={contractErrors.contractDuration}
+                                disabled={contractSubmitting}
+                                options={[
+                                    { value: 6, label: '6 luni' },
+                                    { value: 12, label: '12 luni' },
+                                    { value: 24, label: '24 luni' },
+                                    { value: 36, label: '36 luni' }
+                                ]}
+                                className="duration-select"
+                            />
                         </div>
                         <div className="summary-item">
                             <span className="summary-label">Perioadă:</span>
@@ -526,40 +543,30 @@ function RentalContractPage() {
                     <div className="payment-section">
                         <h3>Metodă de Plată</h3>
                         <div className="payment-options">
-                            <label className="payment-option">
-                                <input
-                                    type="radio"
-                                    name="paymentMethod"
-                                    value="card"
-                                    checked={paymentMethod === 'card'}
-                                    onChange={handlePaymentMethodChange}
-                                    disabled={isSubmitting}
-                                />
-                                <span className="payment-label">Card de credit/debit</span>
-                            </label>
-                            <label className="payment-option">
-                                <input
-                                    type="radio"
-                                    name="paymentMethod"
-                                    value="transfer"
-                                    checked={paymentMethod === 'transfer'}
-                                    onChange={handlePaymentMethodChange}
-                                    disabled={isSubmitting}
-                                />
-                                <span className="payment-label">Transfer bancar</span>
-                            </label>
-                            <label className="payment-option">
-                                <input
-                                    type="radio"
-                                    name="paymentMethod"
-                                    value="cash"
-                                    checked={paymentMethod === 'cash'}
-                                    onChange={handlePaymentMethodChange}
-                                    disabled={isSubmitting}
-                                />
-                                <span className="payment-label">Numerar la sediul companiei</span>
-                            </label>
+                            {[
+                                { value: 'card', label: 'Card de credit/debit' },
+                                { value: 'transfer', label: 'Transfer bancar' },
+                                { value: 'cash', label: 'Numerar la sediul companiei' }
+                            ].map(option => (
+                                <label key={option.value} className="payment-option">
+                                    <input
+                                        type="radio"
+                                        name="paymentMethod"
+                                        value={option.value}
+                                        checked={contractFormData.paymentMethod === option.value}
+                                        onChange={(e) => handleContractChange('paymentMethod', e.target.value)}
+                                        disabled={contractSubmitting}
+                                    />
+                                    <span className="payment-label">{option.label}</span>
+                                </label>
+                            ))}
                         </div>
+                        {contractErrors.paymentMethod && (
+                            <div className="validated-input-error">
+                                <span className="error-icon">⚠️</span>
+                                {contractErrors.paymentMethod}
+                            </div>
+                        )}
                     </div>
 
                     <div className="signature-section">
@@ -567,13 +574,16 @@ function RentalContractPage() {
                         <p className="signature-info">
                             Introduceți numele complet pentru a semna electronic acest contract.
                         </p>
-                        <input
+                        <ValidatedInput
                             type="text"
-                            className="signature-input"
+                            name="signatureData"
+                            value={contractFormData.signatureData}
+                            onChange={handleContractChange}
+                            onBlur={handleContractBlur}
+                            error={contractErrors.signatureData}
                             placeholder="Nume și prenume"
-                            value={signatureData}
-                            onChange={handleSignatureChange}
-                            disabled={isSubmitting}
+                            disabled={contractSubmitting}
+                            className="signature-input-field"
                         />
                     </div>
 
@@ -581,28 +591,34 @@ function RentalContractPage() {
                         <label className="terms-checkbox">
                             <input
                                 type="checkbox"
-                                checked={termsAccepted}
-                                onChange={handleTermsAccepted}
-                                disabled={isSubmitting}
+                                checked={contractFormData.termsAccepted}
+                                onChange={(e) => handleContractChange('termsAccepted', e.target.checked)}
+                                disabled={contractSubmitting}
                             />
                             <span>
                                 Am citit și sunt de acord cu termenii și condițiile contractului de închiriere.
                             </span>
                         </label>
+                        {contractErrors.termsAccepted && (
+                            <div className="validated-input-error">
+                                <span className="error-icon">⚠️</span>
+                                {contractErrors.termsAccepted}
+                            </div>
+                        )}
                     </div>
 
                     <div className="contract-actions">
                         <button
                             className="btn btn-sign"
                             onClick={handleSubmit}
-                            disabled={isSubmitting || !termsAccepted || !paymentMethod || !signatureData}
+                            disabled={contractSubmitting || !validateContractFields()}
                         >
-                            {isSubmitting ? 'Se procesează...' : 'Semnează și Finalizează Contractul'}
+                            {contractSubmitting ? 'Se procesează...' : 'Semnează și Finalizează Contractul'}
                         </button>
                         <button
                             className="btn btn-cancel"
                             onClick={handleCancel}
-                            disabled={isSubmitting}
+                            disabled={contractSubmitting}
                         >
                             Anulează
                         </button>

@@ -3,6 +3,11 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './BuildingsPage.css';
 
+// ADĂUGAT: Import-uri pentru validare
+import { useFormValidation } from './hooks/useFormValidation';
+import { buildingValidationRules, validateCoordinates } from './utils/validation';
+import ValidatedInput from './components/forms/ValidatedInput';
+
 function BuildingsPage() {
     const [buildings, setBuildings] = useState([]);
     const [filteredBuildings, setFilteredBuildings] = useState([]);
@@ -12,13 +17,39 @@ function BuildingsPage() {
     const [currentBuilding, setCurrentBuilding] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOption, setSortOption] = useState('name');
-    const [formData, setFormData] = useState({
+
+    // ÎNLOCUIT: useState pentru formData cu useFormValidation
+    const {
+        values: formData,
+        errors,
+        touched,
+        isSubmitting,
+        handleChange,
+        handleBlur,
+        validateAllFields,
+        setSubmitting,
+        setFormValues,
+        resetForm
+    } = useFormValidation({
         name: '',
         address: '',
         totalFloors: 1,
         yearBuilt: 2000,
         latitude: 0,
         longitude: 0
+    }, {
+        ...buildingValidationRules,
+        // Validare specială pentru coordonate
+        coordinates: [() => {
+            const coordResult = validateCoordinates(formData.latitude, formData.longitude);
+            if (!coordResult.isValid) {
+                return {
+                    isValid: false,
+                    message: Object.values(coordResult.errors).join(', ')
+                };
+            }
+            return { isValid: true, message: '' };
+        }]
     });
 
     const navigate = useNavigate();
@@ -70,21 +101,18 @@ function BuildingsPage() {
         setFilteredBuildings(filtered);
     };
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-
-        // Convert numeric fields
-        if (name === 'totalFloors' || name === 'yearBuilt') {
-            setFormData({ ...formData, [name]: parseInt(value) || 0 });
-        } else if (name === 'latitude' || name === 'longitude') {
-            setFormData({ ...formData, [name]: parseFloat(value) || 0 });
-        } else {
-            setFormData({ ...formData, [name]: value });
-        }
-    };
-
+    // ACTUALIZAT: handleCreateSubmit cu validare
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
+
+        // Validează toate câmpurile
+        if (!validateAllFields()) {
+            alert('Te rugăm să corectezi erorile din formular înainte de a continua.');
+            return;
+        }
+
+        setSubmitting(true);
+
         try {
             const response = await axios.post('http://localhost:8080/buildings', formData);
             setBuildings([...buildings, response.data]);
@@ -93,12 +121,28 @@ function BuildingsPage() {
             alert('Clădirea a fost adăugată cu succes!');
         } catch (error) {
             console.error('Error creating building:', error);
-            alert('Eroare la adăugarea clădirii.');
+            if (error.response && error.response.status === 400) {
+                alert('Datele introduse nu sunt valide. Verifică toate câmpurile și încearcă din nou.');
+            } else {
+                alert('Eroare la adăugarea clădirii.');
+            }
+        } finally {
+            setSubmitting(false);
         }
     };
 
+    // ACTUALIZAT: handleUpdateSubmit cu validare
     const handleUpdateSubmit = async (e) => {
         e.preventDefault();
+
+        // Validează toate câmpurile
+        if (!validateAllFields()) {
+            alert('Te rugăm să corectezi erorile din formular înainte de a continua.');
+            return;
+        }
+
+        setSubmitting(true);
+
         try {
             const response = await axios.put(`http://localhost:8080/buildings/${currentBuilding.id}`, formData);
             const updatedBuildings = buildings.map(b =>
@@ -111,7 +155,13 @@ function BuildingsPage() {
             alert('Clădirea a fost actualizată cu succes!');
         } catch (error) {
             console.error('Error updating building:', error);
-            alert('Eroare la actualizarea clădirii.');
+            if (error.response && error.response.status === 400) {
+                alert('Datele introduse nu sunt valide. Verifică toate câmpurile și încearcă din nou.');
+            } else {
+                alert('Eroare la actualizarea clădirii.');
+            }
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -128,9 +178,10 @@ function BuildingsPage() {
         }
     };
 
+    // ACTUALIZAT: handleEdit cu setarea valorilor în formularul de validare
     const handleEdit = (building) => {
         setCurrentBuilding(building);
-        setFormData({
+        setFormValues({
             name: building.name,
             address: building.address,
             totalFloors: building.totalFloors,
@@ -142,17 +193,7 @@ function BuildingsPage() {
         setIsCreating(false);
     };
 
-    const resetForm = () => {
-        setFormData({
-            name: '',
-            address: '',
-            totalFloors: 1,
-            yearBuilt: 2000,
-            latitude: 0,
-            longitude: 0
-        });
-    };
-
+    // ACTUALIZAT: handleCancel
     const handleCancel = () => {
         setIsCreating(false);
         setIsEditing(false);
@@ -174,6 +215,7 @@ function BuildingsPage() {
                     <button className="btn btn-create" onClick={() => {
                         setIsCreating(true);
                         setIsEditing(false);
+                        resetForm();
                     }}>
                         + Adaugă Clădire
                     </button>
@@ -185,82 +227,109 @@ function BuildingsPage() {
                     <div className="building-form">
                         <h3>{isCreating ? 'Adaugă clădire nouă' : 'Editează clădire'}</h3>
                         <form onSubmit={isCreating ? handleCreateSubmit : handleUpdateSubmit}>
-                            <div className="form-group">
-                                <label htmlFor="name">Nume clădire *</label>
-                                <input
-                                    type="text"
-                                    id="name"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleInputChange}
-                                    required
+                            {/* ÎNLOCUIT: Input-urile clasice cu ValidatedInput */}
+                            <ValidatedInput
+                                type="text"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={errors.name}
+                                label="Nume clădire"
+                                placeholder="Ex: Business Center Plaza"
+                                required
+                                disabled={isSubmitting}
+                            />
+
+                            <ValidatedInput
+                                type="text"
+                                name="address"
+                                value={formData.address}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                error={errors.address}
+                                label="Adresă"
+                                placeholder="Ex: Str. Memorandumului nr. 28, Cluj-Napoca"
+                                required
+                                disabled={isSubmitting}
+                            />
+
+                            <div className="form-row">
+                                <ValidatedInput
+                                    type="number"
+                                    name="totalFloors"
+                                    value={formData.totalFloors}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={errors.totalFloors}
+                                    label="Număr etaje"
+                                    placeholder="Ex: 5"
+                                    min="1"
+                                    max="100"
+                                    disabled={isSubmitting}
+                                />
+
+                                <ValidatedInput
+                                    type="number"
+                                    name="yearBuilt"
+                                    value={formData.yearBuilt}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={errors.yearBuilt}
+                                    label="An construcție"
+                                    placeholder="Ex: 2020"
+                                    min="1800"
+                                    max={new Date().getFullYear()}
+                                    disabled={isSubmitting}
                                 />
                             </div>
-                            <div className="form-group">
-                                <label htmlFor="address">Adresă *</label>
-                                <input
-                                    type="text"
-                                    id="address"
-                                    name="address"
-                                    value={formData.address}
-                                    onChange={handleInputChange}
-                                    required
+
+                            <div className="form-row">
+                                <ValidatedInput
+                                    type="number"
+                                    name="latitude"
+                                    value={formData.latitude}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={errors.latitude || (errors.coordinates && errors.coordinates.includes('Latitudine') ? errors.coordinates : '')}
+                                    label="Latitudine"
+                                    placeholder="Ex: 46.7712"
+                                    step="0.000001"
+                                    min="-90"
+                                    max="90"
+                                    disabled={isSubmitting}
+                                />
+
+                                <ValidatedInput
+                                    type="number"
+                                    name="longitude"
+                                    value={formData.longitude}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={errors.longitude || (errors.coordinates && errors.coordinates.includes('Longitudine') ? errors.coordinates : '')}
+                                    label="Longitudine"
+                                    placeholder="Ex: 23.6236"
+                                    step="0.000001"
+                                    min="-180"
+                                    max="180"
+                                    disabled={isSubmitting}
                                 />
                             </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="totalFloors">Număr etaje</label>
-                                    <input
-                                        type="number"
-                                        id="totalFloors"
-                                        name="totalFloors"
-                                        min="1"
-                                        value={formData.totalFloors}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="yearBuilt">An construcție</label>
-                                    <input
-                                        type="number"
-                                        id="yearBuilt"
-                                        name="yearBuilt"
-                                        min="1900"
-                                        max={new Date().getFullYear()}
-                                        value={formData.yearBuilt}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="latitude">Latitudine</label>
-                                    <input
-                                        type="number"
-                                        id="latitude"
-                                        name="latitude"
-                                        step="0.000001"
-                                        value={formData.latitude}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="longitude">Longitudine</label>
-                                    <input
-                                        type="number"
-                                        id="longitude"
-                                        name="longitude"
-                                        step="0.000001"
-                                        value={formData.longitude}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                            </div>
+
                             <div className="form-actions">
-                                <button type="submit" className="btn btn-save">
-                                    {isCreating ? 'Adaugă' : 'Actualizează'}
+                                <button
+                                    type="submit"
+                                    className="btn btn-save"
+                                    disabled={isSubmitting || !validateAllFields()}
+                                >
+                                    {isSubmitting ? 'Se procesează...' : (isCreating ? 'Adaugă' : 'Actualizează')}
                                 </button>
-                                <button type="button" className="btn btn-cancel" onClick={handleCancel}>
+                                <button
+                                    type="button"
+                                    className="btn btn-cancel"
+                                    onClick={handleCancel}
+                                    disabled={isSubmitting}
+                                >
                                     Anulează
                                 </button>
                             </div>
