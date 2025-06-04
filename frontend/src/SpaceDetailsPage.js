@@ -236,23 +236,6 @@ function SpaceDetailsPage() {
                 <div className="space-type-badge">{space.spaceType}</div>
             </div>
 
-            {/* DEBUG INFO pentru Owner */}
-            {user?.role === 'OWNER' && (
-                <div style={{
-                    backgroundColor: '#e3f2fd',
-                    padding: '10px',
-                    margin: '10px 0',
-                    borderRadius: '4px',
-                    fontSize: '14px'
-                }}>
-                    <strong>DEBUG INFO:</strong>
-                    User ID: {user.id},
-                    Space Owner ID: {space.ownerId},
-                    Can Edit: {canEdit ? 'YES' : 'NO'},
-                    Owner Name: {space.ownerName}
-                </div>
-            )}
-
             {isEditing ? (
                 <form className="edit-form" onSubmit={handleSubmit}>
                     <div className="form-section">

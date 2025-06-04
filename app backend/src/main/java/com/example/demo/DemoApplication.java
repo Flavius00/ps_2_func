@@ -6,8 +6,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
-// ELIMINAT exclude = {DataSourceAutoConfiguration.class, HibernateJpaAutoConfiguration.class}
-// Pentru a permite Spring să configureze automat JPA și conexiunea la baza de date
 @SpringBootApplication
 public class DemoApplication {
 

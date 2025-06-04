@@ -8,8 +8,10 @@ import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.mapper.ComercialSpaceMapper;
 import com.example.demo.model.ComercialSpace;
 import com.example.demo.service.ComercialSpaceService;
+import com.example.demo.service.PriceCalculatorService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -214,5 +216,22 @@ public class ComercialSpaceController {
 
         log.info("Total available spaces count: {}", count);
         return ResponseEntity.ok(count);
+    }
+
+    @Autowired
+    private PriceCalculatorService priceCalculatorService;
+
+    @GetMapping("/price/calculate")
+    public ResponseEntity<Double> calculatePrice(
+            @RequestParam Long spaceId,
+            @RequestParam int contractMonths,
+            @RequestParam String strategy) {
+        try {
+            ComercialSpace space = spaceService.getSpaceById(spaceId);
+            double price = priceCalculatorService.calculatePrice(space, contractMonths, strategy);
+            return ResponseEntity.ok(price);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 }

@@ -3,6 +3,145 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './RentalContractPage.css';
 
+// ============ STRATEGY PATTERN IMPLEMENTATION ============
+
+// Strategy interface
+class PricingStrategy {
+    calculateTotal(basePrice, duration) {
+        throw new Error('Method must be implemented');
+    }
+
+    getDiscountDescription() {
+        throw new Error('Method must be implemented');
+    }
+
+    getStrategyName() {
+        throw new Error('Method must be implemented');
+    }
+}
+
+// Concrete strategies
+class ShortTermStrategy extends PricingStrategy {
+    calculateTotal(basePrice, duration) {
+        return {
+            monthlyRent: basePrice,
+            totalValue: basePrice * duration,
+            discount: 0,
+            discountAmount: 0,
+            originalTotal: basePrice * duration
+        };
+    }
+
+    getDiscountDescription() {
+        return "Fără discount pentru contracte sub 12 luni";
+    }
+
+    getStrategyName() {
+        return "Short Term";
+    }
+}
+
+class MediumTermStrategy extends PricingStrategy {
+    calculateTotal(basePrice, duration) {
+        const discount = 0.05; // 5% discount
+        const discountedPrice = basePrice * (1 - discount);
+        const originalTotal = basePrice * duration;
+        const discountedTotal = discountedPrice * duration;
+
+        return {
+            monthlyRent: discountedPrice,
+            totalValue: discountedTotal,
+            discount: discount * 100,
+            discountAmount: originalTotal - discountedTotal,
+            originalTotal: originalTotal
+        };
+    }
+
+    getDiscountDescription() {
+        return "🎉 5% discount pentru contracte de 12 luni!";
+    }
+
+    getStrategyName() {
+        return "Medium Term";
+    }
+}
+
+class LongTermStrategy extends PricingStrategy {
+    calculateTotal(basePrice, duration) {
+        let discount = 0.10; // 10% pentru 24 luni
+        if (duration >= 36) {
+            discount = 0.15; // 15% pentru 36+ luni
+        }
+
+        const discountedPrice = basePrice * (1 - discount);
+        const originalTotal = basePrice * duration;
+        const discountedTotal = discountedPrice * duration;
+
+        return {
+            monthlyRent: discountedPrice,
+            totalValue: discountedTotal,
+            discount: discount * 100,
+            discountAmount: originalTotal - discountedTotal,
+            originalTotal: originalTotal
+        };
+    }
+
+    getDiscountDescription() {
+        return "🏆 Discount special pentru contracte lungi!";
+    }
+
+    getStrategyName() {
+        return "Long Term";
+    }
+}
+
+// Context class
+class PricingContext {
+    constructor() {
+        this.strategy = null;
+    }
+
+    setStrategy(strategy) {
+        this.strategy = strategy;
+        console.log(`🔄 Strategy changed to: ${strategy.getStrategyName()}`);
+    }
+
+    calculatePrice(basePrice, duration) {
+        if (!this.strategy) {
+            throw new Error('Pricing strategy not set');
+        }
+
+        const pricing = this.strategy.calculateTotal(basePrice, duration);
+        const securityDeposit = basePrice * 2;
+        const initialPayment = pricing.monthlyRent + securityDeposit;
+
+        return {
+            ...pricing,
+            securityDeposit,
+            initialPayment,
+            description: this.strategy.getDiscountDescription(),
+            strategyName: this.strategy.getStrategyName()
+        };
+    }
+}
+
+// Factory pentru strategii
+class PricingStrategyFactory {
+    static createStrategy(duration) {
+        console.log(`🏭 Creating strategy for ${duration} months`);
+
+        if (duration < 12) {
+            return new ShortTermStrategy();
+        } else if (duration === 12) {
+            return new MediumTermStrategy();
+        } else {
+            return new LongTermStrategy();
+        }
+    }
+}
+
+// ============ REACT COMPONENT ============
+
 function RentalContractPage() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -10,13 +149,16 @@ function RentalContractPage() {
     const [space, setSpace] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [contractDuration, setContractDuration] = useState(12); // Default 12 months
+    const [contractDuration, setContractDuration] = useState(12);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('');
     const [signatureData, setSignatureData] = useState('');
 
-    // Calcularea datelor de contract
+    // Strategy Pattern: Context și pricing
+    const [pricingContext] = useState(new PricingContext());
+    const [pricing, setPricing] = useState(null);
+
     const startDate = new Date();
     const formattedStartDate = startDate.toISOString().split('T')[0];
 
@@ -25,7 +167,6 @@ function RentalContractPage() {
     const formattedEndDate = endDate.toISOString().split('T')[0];
 
     useEffect(() => {
-        // Verifică dacă utilizatorul este autentificat și este chiriaș
         const storedUser = JSON.parse(localStorage.getItem('user'));
         if (!storedUser || storedUser.role !== 'TENANT') {
             navigate('/spaces');
@@ -33,7 +174,6 @@ function RentalContractPage() {
         }
         setUser(storedUser);
 
-        // Verifică dacă există informații despre spațiu
         if (!location.state || !location.state.selectedSpace) {
             setError('Informații despre spațiu lipsă.');
             setLoading(false);
@@ -44,21 +184,27 @@ function RentalContractPage() {
         setLoading(false);
     }, [location, navigate]);
 
-    const calculateTotal = () => {
-        if (!space) return { monthlyRent: 0, securityDeposit: 0, totalValue: 0, initialPayment: 0 };
+    // Strategy Pattern: Recalculează prețurile când se schimbă durata
+    useEffect(() => {
+        if (space && contractDuration) {
+            console.log(`💰 Calculating pricing for ${contractDuration} months`);
 
-        const monthlyRent = space.pricePerMonth;
-        const securityDeposit = monthlyRent * 2; // Garanție de două luni
-        const totalValue = monthlyRent * contractDuration;
-        const initialPayment = monthlyRent + securityDeposit; // Prima lună + garanție
+            // Creează și setează strategia
+            const strategy = PricingStrategyFactory.createStrategy(parseInt(contractDuration));
+            pricingContext.setStrategy(strategy);
 
-        return { monthlyRent, securityDeposit, totalValue, initialPayment };
-    };
+            // Calculează prețurile
+            const result = pricingContext.calculatePrice(space.pricePerMonth, parseInt(contractDuration));
+            setPricing(result);
 
-    const { monthlyRent, securityDeposit, totalValue, initialPayment } = calculateTotal();
+            console.log('📊 Pricing result:', result);
+        }
+    }, [space, contractDuration, pricingContext]);
 
     const handleContractDurationChange = (e) => {
-        setContractDuration(e.target.value);
+        const newDuration = e.target.value;
+        console.log(`📅 Duration changed from ${contractDuration} to ${newDuration} months`);
+        setContractDuration(newDuration);
     };
 
     const handleTermsAccepted = (e) => {
@@ -98,34 +244,30 @@ function RentalContractPage() {
         setIsSubmitting(true);
 
         try {
-            // CORECTARE CRITICĂ: Trimite datele către endpoint-ul corect pentru contracte
             const contractData = {
-                // Trimite doar ID-urile pentru space și tenant
                 spaceId: space.id,
                 tenantId: user.id,
                 startDate: formattedStartDate,
                 endDate: formattedEndDate,
-                monthlyRent: monthlyRent,
-                securityDeposit: securityDeposit,
+                monthlyRent: pricing.monthlyRent, // Folosește prețul calculat de strategii
+                securityDeposit: pricing.securityDeposit,
                 status: "ACTIVE",
                 isPaid: true,
                 dateCreated: formattedStartDate,
                 contractNumber: `RENT-${Date.now()}`,
-                notes: `Contract încheiat electronic. Metodă de plată: ${paymentMethod}. Durata: ${contractDuration} luni. Semnătură: ${signatureData}`
+                notes: `Contract încheiat electronic. Metodă de plată: ${paymentMethod}. Durata: ${contractDuration} luni. Discount aplicat: ${pricing.discount}%. Economii: ${pricing.discountAmount}€. Strategie folosită: ${pricing.strategyName}. Semnătură: ${signatureData}`
             };
 
-            console.log('Sending contract data:', contractData);
+            console.log('📝 Creating contract with pricing strategy data:', contractData);
 
-            // CORECTARE CRITICĂ: Folosește endpoint-ul corect pentru contracte
             const response = await axios.post('http://localhost:8080/contracts/create', contractData, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
 
-            console.log('Contract created successfully:', response.data);
+            console.log('✅ Contract created successfully:', response.data);
 
-            // Actualizează spațiul ca fiind închiriat (doar după ce contractul a fost creat cu succes)
             try {
                 await axios.post('http://localhost:8080/spaces/update', {
                     id: space.id,
@@ -134,11 +276,10 @@ function RentalContractPage() {
                     area: space.area,
                     pricePerMonth: space.pricePerMonth,
                     address: space.address,
-                    available: false, // Marchează ca fiind închiriat
+                    available: false,
                     latitude: space.latitude,
                     longitude: space.longitude,
                     amenities: space.amenities,
-                    // Include type-specific fields dacă există
                     floors: space.floors,
                     numberOfRooms: space.numberOfRooms,
                     hasReception: space.hasReception,
@@ -149,21 +290,20 @@ function RentalContractPage() {
                     hasLoadingDock: space.hasLoadingDock,
                     securityLevel: space.securityLevel
                 });
-                console.log('Space updated successfully as rented');
             } catch (spaceUpdateError) {
                 console.warn('Failed to update space availability:', spaceUpdateError);
-                // Nu oprește procesul, contractul a fost creat cu succes
             }
 
-            // Creează obiectul pentru pagina de confirmare
             const contractForConfirmation = {
                 ...contractData,
                 id: response.data.id,
                 paymentMethod: paymentMethod,
-                signature: signatureData
+                signature: signatureData,
+                appliedDiscount: pricing.discount,
+                savings: pricing.discountAmount,
+                strategyUsed: pricing.strategyName
             };
 
-            // Navigare către pagina de confirmare
             navigate('/payment/confirm', {
                 state: {
                     contract: contractForConfirmation,
@@ -172,15 +312,10 @@ function RentalContractPage() {
             });
 
         } catch (error) {
-            console.error('Eroare la crearea contractului:', error);
+            console.error('❌ Error creating contract:', error);
             if (error.response) {
-                console.error('Server response status:', error.response.status);
-                console.error('Server response data:', error.response.data);
-
-                // Handle different types of errors
                 if (error.response.status === 400) {
                     if (error.response.data.errors) {
-                        // Validation errors
                         const validationErrors = error.response.data.errors;
                         const errorMessages = Object.entries(validationErrors)
                             .map(([field, message]) => `${field}: ${message}`)
@@ -219,6 +354,10 @@ function RentalContractPage() {
         );
     }
 
+    if (!pricing) {
+        return <div className="loading-container">Se calculează prețurile...</div>;
+    }
+
     return (
         <div className="contract-page-container">
             <div className="contract-header">
@@ -255,110 +394,29 @@ function RentalContractPage() {
                             </div>
 
                             <div className="contract-article">
-                                <h5>II. OBIECTUL CONTRACTULUI</h5>
-                                <p>
-                                    2.1 PROPRIETARUL închiriază CHIRIAȘULUI spațiul comercial situat la adresa {space.address || space.buildingAddress},
-                                    având o suprafață de {space.area} m², destinat pentru activități comerciale.
-                                </p>
-                                <p>
-                                    2.2 Spațiul va fi utilizat de CHIRIAȘ exclusiv pentru activitatea sa
-                                    comercială, respectiv {user.businessType || 'activitatea comercială a chiriașului'}.
-                                </p>
-                            </div>
-
-                            <div className="contract-article">
-                                <h5>III. DURATA CONTRACTULUI</h5>
-                                <p>
-                                    3.1 Prezentul contract se încheie pe o perioadă de {contractDuration} luni,
-                                    începând cu data de {formattedStartDate} și până la data de {formattedEndDate}.
-                                </p>
-                                <p>
-                                    3.2 La expirarea termenului, contractul poate fi prelungit prin acordul scris al ambelor părți.
-                                </p>
-                            </div>
-
-                            <div className="contract-article">
                                 <h5>IV. PREȚUL ÎNCHIRIERII</h5>
                                 <p>
-                                    4.1 Chiria lunară este de {monthlyRent} Euro, plătibilă în lei la cursul BNR din ziua plății,
+                                    4.1 Chiria lunară este de {pricing.monthlyRent.toFixed(2)} Euro, plătibilă în lei la cursul BNR din ziua plății,
                                     în primele 5 zile ale fiecărei luni.
                                 </p>
+                                {pricing.discount > 0 && (
+                                    <p style={{color: '#27ae60', fontWeight: 'bold'}}>
+                                        4.1.1 S-a aplicat un discount de {pricing.discount}% pentru durata contractului de {contractDuration} luni,
+                                        rezultând o economie totală de {pricing.discountAmount.toFixed(2)} Euro.
+                                    </p>
+                                )}
                                 <p>
-                                    4.2 CHIRIAȘUL se obligă să plătească o garanție în valoare de {securityDeposit} Euro,
+                                    4.2 CHIRIAȘUL se obligă să plătească o garanție în valoare de {pricing.securityDeposit.toFixed(2)} Euro,
                                     echivalentul a două chirii lunare, care se va restitui la încetarea contractului,
                                     mai puțin sumele datorate pentru eventualele daune.
                                 </p>
                                 <p>
-                                    4.3 Valoarea totală a contractului pentru întreaga perioadă este de {totalValue} Euro.
-                                </p>
-                            </div>
-
-                            <div className="contract-article">
-                                <h5>V. OBLIGAȚIILE PROPRIETARULUI</h5>
-                                <p>
-                                    5.1 Să predea spațiul în stare corespunzătoare utilizării pentru care a fost închiriat.
-                                </p>
-                                <p>
-                                    5.2 Să asigure folosința liniștită și utilă a spațiului pe toată durata contractului.
-                                </p>
-                                <p>
-                                    5.3 Să efectueze reparațiile majore necesare menținerii spațiului în stare corespunzătoare.
-                                </p>
-                            </div>
-
-                            <div className="contract-article">
-                                <h5>VI. OBLIGAȚIILE CHIRIAȘULUI</h5>
-                                <p>
-                                    6.1 Să folosească spațiul conform destinației stabilite prin contract.
-                                </p>
-                                <p>
-                                    6.2 Să plătească chiria la termenele și în condițiile stabilite.
-                                </p>
-                                <p>
-                                    6.3 Să efectueze reparațiile locative și de întreținere curentă.
-                                </p>
-                                <p>
-                                    6.4 Să nu subînchirieze sau să cedeze folosința spațiului unui terț fără acordul scris al PROPRIETARULUI.
-                                </p>
-                                <p>
-                                    6.5 Să restituie spațiul la încetarea contractului în starea în care l-a primit, luând în considerare uzura normală.
-                                </p>
-                            </div>
-
-                            <div className="contract-article">
-                                <h5>VII. ÎNCETAREA CONTRACTULUI</h5>
-                                <p>
-                                    7.1 Contractul încetează la expirarea termenului pentru care a fost încheiat.
-                                </p>
-                                <p>
-                                    7.2 Contractul poate înceta înainte de termen prin acordul scris al părților.
-                                </p>
-                                <p>
-                                    7.3 PROPRIETARUL poate rezilia contractul dacă CHIRIAȘUL nu respectă obligațiile asumate,
-                                    în special neachitarea chiriei timp de două luni consecutive.
-                                </p>
-                                <p>
-                                    7.4 CHIRIAȘUL poate rezilia contractul dacă PROPRIETARUL nu respectă obligațiile asumate
-                                    privind asigurarea folosinței spațiului.
-                                </p>
-                            </div>
-
-                            <div className="contract-article">
-                                <h5>VIII. FORȚA MAJORĂ</h5>
-                                <p>
-                                    8.1 Niciuna dintre părți nu răspunde pentru neexecutarea la termen sau/și de
-                                    executarea în mod necorespunzător a oricărei obligații care îi revine în baza
-                                    prezentului contract, dacă neexecutarea sau executarea necorespunzătoare a fost
-                                    cauzată de forța majoră, așa cum este definită de lege.
-                                </p>
-                            </div>
-
-                            <div className="contract-article">
-                                <h5>IX. LITIGII</h5>
-                                <p>
-                                    9.1 Litigiile de orice fel decurgând din executarea prezentului contract vor fi
-                                    soluționate pe cale amiabilă. În cazul în care acest lucru nu este posibil,
-                                    litigiile vor fi supuse instanțelor judecătorești competente din România.
+                                    4.3 Valoarea totală a contractului pentru întreaga perioadă este de {pricing.totalValue.toFixed(2)} Euro
+                                    {pricing.discount > 0 && (
+                                        <span style={{color: '#27ae60'}}>
+                                            {' '}(față de {pricing.originalTotal.toFixed(2)} Euro fără discount)
+                                        </span>
+                                    )}.
                                 </p>
                             </div>
                         </div>
@@ -366,6 +424,30 @@ function RentalContractPage() {
                 </div>
 
                 <div className="contract-sidebar">
+                    {/* Strategy Pattern Visualization */}
+                    <div style={{
+                        backgroundColor: '#e3f2fd',
+                        border: '2px solid #2196f3',
+                        borderRadius: '8px',
+                        padding: '15px',
+                        marginBottom: '1.5rem'
+                    }}>
+                        <h4 style={{margin: '0 0 10px 0', color: '#1976d2'}}>
+                            🔧 Strategy Pattern Active
+                        </h4>
+                        <p style={{margin: '5px 0', fontSize: '14px'}}>
+                            <strong>Current Strategy:</strong> {pricing.strategyName}
+                        </p>
+                        <p style={{margin: '5px 0', fontSize: '14px', color: '#27ae60'}}>
+                            {pricing.description}
+                        </p>
+                        {pricing.discount > 0 && (
+                            <p style={{margin: '5px 0', fontSize: '14px', color: '#27ae60', fontWeight: 'bold'}}>
+                                💰 Economisești: {pricing.discountAmount.toFixed(2)} €
+                            </p>
+                        )}
+                    </div>
+
                     <div className="contract-summary">
                         <h3>Sumar Contract</h3>
                         <div className="summary-item">
@@ -381,12 +463,22 @@ function RentalContractPage() {
                             <span className="summary-value">{space.area} m²</span>
                         </div>
                         <div className="summary-item">
-                            <span className="summary-label">Chirie lunară:</span>
-                            <span className="summary-value">{monthlyRent} €</span>
+                            <span className="summary-label">Preț original:</span>
+                            <span className="summary-value" style={pricing.discount > 0 ? {textDecoration: 'line-through', color: '#95a5a6'} : {}}>
+                                {space.pricePerMonth} €
+                            </span>
                         </div>
+                        {pricing.discount > 0 && (
+                            <div className="summary-item">
+                                <span className="summary-label">Preț cu discount:</span>
+                                <span className="summary-value" style={{color: '#27ae60', fontWeight: 'bold'}}>
+                                    {pricing.monthlyRent.toFixed(2)} € (-{pricing.discount}%)
+                                </span>
+                            </div>
+                        )}
                         <div className="summary-item">
                             <span className="summary-label">Garanție:</span>
-                            <span className="summary-value">{securityDeposit} €</span>
+                            <span className="summary-value">{pricing.securityDeposit.toFixed(2)} €</span>
                         </div>
                         <div className="summary-item duration">
                             <span className="summary-label">Durată contract:</span>
@@ -394,6 +486,11 @@ function RentalContractPage() {
                                 value={contractDuration}
                                 onChange={handleContractDurationChange}
                                 disabled={isSubmitting}
+                                style={{
+                                    padding: '8px',
+                                    borderRadius: '4px',
+                                    border: '2px solid #2196f3'
+                                }}
                             >
                                 <option value="6">6 luni</option>
                                 <option value="12">12 luni</option>
@@ -407,13 +504,21 @@ function RentalContractPage() {
                                 {formattedStartDate} - {formattedEndDate}
                             </span>
                         </div>
+                        {pricing.discount > 0 && (
+                            <div className="summary-item" style={{backgroundColor: '#e8f5e9', padding: '10px', borderRadius: '4px', marginBottom: '10px'}}>
+                                <span className="summary-label">Economie totală:</span>
+                                <span className="summary-value" style={{color: '#27ae60', fontWeight: 'bold'}}>
+                                    {pricing.discountAmount.toFixed(2)} €
+                                </span>
+                            </div>
+                        )}
                         <div className="summary-item total-value">
                             <span className="summary-label">Valoare totală:</span>
-                            <span className="summary-value">{totalValue} €</span>
+                            <span className="summary-value">{pricing.totalValue.toFixed(2)} €</span>
                         </div>
                         <div className="summary-item payment-total">
                             <span className="summary-label">Plată inițială:</span>
-                            <span className="summary-value">{initialPayment} €</span>
+                            <span className="summary-value">{pricing.initialPayment.toFixed(2)} €</span>
                             <span className="summary-note">(prima lună + garanție)</span>
                         </div>
                     </div>
