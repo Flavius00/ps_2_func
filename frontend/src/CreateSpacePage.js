@@ -1,27 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './CreateSpacePage.css';
 
-// Import components for validation
-import ValidatedInput from './components/forms/ValidatedInput';
-import ValidatedTextarea from './components/forms/ValidatedTextarea';
-import ValidatedSelect from './components/forms/ValidatedSelect';
-
-// Assuming validation utils are defined elsewhere
-import { validateCoordinates } from './utils/validation';
-
 function CreateSpacePage() {
     const navigate = useNavigate();
-
-    // Basic state management
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
     const [buildings, setBuildings] = useState([]);
     const [user, setUser] = useState(null);
     const [error, setError] = useState('');
-
-    // Form state
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -32,28 +19,24 @@ function CreateSpacePage() {
         longitude: 0,
         spaceType: 'OFFICE',
         available: true,
-        // Office-specific properties
+        // Proprietăți specifice pentru birouri
         floors: 1,
         numberOfRooms: 1,
         hasReception: false,
-        // Retail-specific properties
+        // Proprietăți specifice pentru spații comerciale
         shopWindowSize: 0,
         hasCustomerEntrance: true,
         maxOccupancy: 0,
-        // Warehouse-specific properties
+        // Proprietăți specifice pentru depozite
         ceilingHeight: 0,
         hasLoadingDock: false,
         securityLevel: 'MEDIUM',
-        // Building and other relationships
+        // Clădire și alte relații
         buildingId: '',
         amenities: []
     });
 
-    // Validation state
-    const [errors, setErrors] = useState({});
-    const [touched, setTouched] = useState({});
-
-    // Amenities options
+    // Lista de facilități pentru checkbox-uri
     const amenitiesOptions = [
         { id: 'air-conditioning', label: 'Aer condiționat' },
         { id: 'heating', label: 'Încălzire' },
@@ -69,7 +52,6 @@ function CreateSpacePage() {
         { id: 'storage', label: 'Spațiu depozitare' }
     ];
 
-    // Load user and buildings on component mount
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user'));
         if (!storedUser || (storedUser.role !== 'OWNER' && storedUser.role !== 'ADMIN')) {
@@ -83,7 +65,7 @@ function CreateSpacePage() {
                 const response = await axios.get('http://localhost:8080/buildings');
                 setBuildings(response.data);
 
-                // Set default building if available
+                // Setează implicit prima clădire dacă există
                 if (response.data.length > 0) {
                     setFormData(prev => ({
                         ...prev,
@@ -99,242 +81,61 @@ function CreateSpacePage() {
         fetchBuildings();
     }, [navigate]);
 
-    // Handle form field changes
-    const handleChange = useCallback((name, value) => {
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
 
-        // Mark field as touched
-        setTouched(prev => ({
-            ...prev,
-            [name]: true
-        }));
-    }, []);
-
-    // Handle amenity checkboxes
-    const handleAmenityChange = useCallback((e) => {
-        const { value, checked } = e.target;
-        const currentAmenities = formData.amenities || [];
-
-        let newAmenities;
-        if (checked) {
-            newAmenities = [...currentAmenities, value];
+        if (type === 'checkbox') {
+            setFormData(prev => ({
+                ...prev,
+                [name]: checked
+            }));
+        } else if (type === 'number') {
+            setFormData(prev => ({
+                ...prev,
+                [name]: parseFloat(value) || 0
+            }));
         } else {
-            newAmenities = currentAmenities.filter(amenity => amenity !== value);
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
+            }));
         }
+    };
 
-        setFormData(prev => ({
-            ...prev,
-            amenities: newAmenities
-        }));
-    }, [formData.amenities]);
+    const handleAmenityChange = (e) => {
+        const { value, checked } = e.target;
 
-    // Handle input blur for validation
-    const handleBlur = useCallback((name) => {
-        setTouched(prev => ({
-            ...prev,
-            [name]: true
-        }));
-        validateField(name);
-    }, []);
-
-    // Validate a specific field
-    const validateField = useCallback((fieldName) => {
-        const newErrors = { ...errors };
-
-        switch (fieldName) {
-            case 'name':
-                if (!formData.name) {
-                    newErrors.name = 'Denumirea spațiului este obligatorie';
-                } else if (formData.name.length < 3) {
-                    newErrors.name = 'Denumirea trebuie să aibă cel puțin 3 caractere';
-                } else {
-                    delete newErrors.name;
-                }
-                break;
-
-            case 'description':
-                if (formData.description && formData.description.length < 10) {
-                    newErrors.description = 'Descrierea trebuie să aibă cel puțin 10 caractere';
-                } else {
-                    delete newErrors.description;
-                }
-                break;
-
-            case 'area':
-                if (!formData.area) {
-                    newErrors.area = 'Suprafața este obligatorie';
-                } else if (formData.area <= 0 || formData.area > 10000) {
-                    newErrors.area = 'Suprafața trebuie să fie între 0 și 10000 m²';
-                } else {
-                    delete newErrors.area;
-                }
-                break;
-
-            case 'pricePerMonth':
-                if (!formData.pricePerMonth) {
-                    newErrors.pricePerMonth = 'Prețul este obligatoriu';
-                } else if (formData.pricePerMonth <= 0 || formData.pricePerMonth > 100000) {
-                    newErrors.pricePerMonth = 'Prețul trebuie să fie între 0 și 100000 €';
-                } else {
-                    delete newErrors.pricePerMonth;
-                }
-                break;
-
-            case 'buildingId':
-                if (!formData.buildingId) {
-                    newErrors.buildingId = 'Selectarea clădirii este obligatorie';
-                } else {
-                    delete newErrors.buildingId;
-                }
-                break;
-
-            case 'latitude':
-            case 'longitude':
-                // Validate coordinates together
-                const coordResult = validateCoordinates(formData.latitude, formData.longitude);
-                if (!coordResult.isValid) {
-                    newErrors.coordinates = Object.values(coordResult.errors).join(', ');
-                } else {
-                    delete newErrors.coordinates;
-                }
-                break;
-
-            // Type-specific validations
-            case 'floors':
-                if (formData.spaceType === 'OFFICE') {
-                    if (!formData.floors || formData.floors < 1) {
-                        newErrors.floors = 'Numărul de etaje este obligatoriu pentru birouri';
-                    } else if (formData.floors > 50) {
-                        newErrors.floors = 'Numărul de etaje trebuie să fie între 1 și 50';
-                    } else {
-                        delete newErrors.floors;
-                    }
-                } else {
-                    delete newErrors.floors;
-                }
-                break;
-
-            case 'numberOfRooms':
-                if (formData.spaceType === 'OFFICE') {
-                    if (!formData.numberOfRooms || formData.numberOfRooms < 1) {
-                        newErrors.numberOfRooms = 'Numărul de camere este obligatoriu pentru birouri';
-                    } else if (formData.numberOfRooms > 100) {
-                        newErrors.numberOfRooms = 'Numărul de camere trebuie să fie între 1 și 100';
-                    } else {
-                        delete newErrors.numberOfRooms;
-                    }
-                } else {
-                    delete newErrors.numberOfRooms;
-                }
-                break;
-
-            case 'shopWindowSize':
-                if (formData.spaceType === 'RETAIL' && formData.shopWindowSize && (formData.shopWindowSize < 0 || formData.shopWindowSize > 50)) {
-                    newErrors.shopWindowSize = 'Dimensiunea vitrinei trebuie să fie între 0 și 50 metri';
-                } else {
-                    delete newErrors.shopWindowSize;
-                }
-                break;
-
-            case 'maxOccupancy':
-                if (formData.spaceType === 'RETAIL' && formData.maxOccupancy && (formData.maxOccupancy < 0 || formData.maxOccupancy > 1000)) {
-                    newErrors.maxOccupancy = 'Capacitatea maximă trebuie să fie între 0 și 1000 persoane';
-                } else {
-                    delete newErrors.maxOccupancy;
-                }
-                break;
-
-            case 'ceilingHeight':
-                if (formData.spaceType === 'WAREHOUSE' && formData.ceilingHeight && (formData.ceilingHeight < 0 || formData.ceilingHeight > 30)) {
-                    newErrors.ceilingHeight = 'Înălțimea tavanului trebuie să fie între 0 și 30 metri';
-                } else {
-                    delete newErrors.ceilingHeight;
-                }
-                break;
-
-            default:
-                break;
+        if (checked) {
+            setFormData(prev => ({
+                ...prev,
+                amenities: [...prev.amenities, value]
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                amenities: prev.amenities.filter(amenity => amenity !== value)
+            }));
         }
+    };
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    }, [formData, errors]);
-
-    // Run validation when space type changes
-    useEffect(() => {
-        if (formData.spaceType === 'OFFICE') {
-            validateField('floors');
-            validateField('numberOfRooms');
-        } else if (formData.spaceType === 'RETAIL') {
-            validateField('shopWindowSize');
-            validateField('maxOccupancy');
-        } else if (formData.spaceType === 'WAREHOUSE') {
-            validateField('ceilingHeight');
-        }
-    }, [formData.spaceType, validateField]);
-
-    // Validate all fields and return if valid
-    const validateAllFields = useCallback(() => {
-        const fieldsToValidate = [
-            'name', 'area', 'pricePerMonth', 'buildingId',
-            'latitude', 'longitude'
-        ];
-
-        // Add type-specific fields
-        if (formData.spaceType === 'OFFICE') {
-            fieldsToValidate.push('floors', 'numberOfRooms');
-        } else if (formData.spaceType === 'RETAIL') {
-            fieldsToValidate.push('shopWindowSize', 'maxOccupancy');
-        } else if (formData.spaceType === 'WAREHOUSE') {
-            fieldsToValidate.push('ceilingHeight');
-        }
-
-        // Mark all as touched
-        const newTouched = {};
-        fieldsToValidate.forEach(field => {
-            newTouched[field] = true;
-        });
-        setTouched(prev => ({ ...prev, ...newTouched }));
-
-        // Validate each field
-        let isValid = true;
-        fieldsToValidate.forEach(field => {
-            if (!validateField(field)) {
-                isValid = false;
-            }
-        });
-
-        return isValid;
-    }, [formData.spaceType, validateField]);
-
-    // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
         setError('');
 
-        // Validate all fields
-        if (!validateAllFields()) {
-            setError('Te rugăm să corectezi erorile din formular înainte de a continua.');
-            return;
-        }
-
-        // Ensure buildingId is properly set
-        if (!formData.buildingId || formData.buildingId === '') {
-            setError('Vă rugăm să selectați o clădire.');
-            return;
-        }
-
-        setIsSubmitting(true);
-
         try {
+            // CRITICAL FIX: Ensure buildingId is properly set
+            if (!formData.buildingId || formData.buildingId === '') {
+                setError('Vă rugăm să selectați o clădire.');
+                setLoading(false);
+                return;
+            }
+
             console.log('=== CREATE SPACE FRONTEND DEBUG ===');
             console.log('User:', user);
             console.log('Form data before processing:', formData);
 
-            // Create proper data structure matching backend DTO
+            // CRITICAL FIX: Create proper data structure matching backend DTO
             const spaceData = {
                 name: formData.name,
                 description: formData.description,
@@ -346,7 +147,7 @@ function CreateSpacePage() {
                 spaceType: formData.spaceType,
                 available: formData.available,
                 amenities: formData.amenities || [],
-                // Type-specific fields (only if they have values)
+                // Type-specific fields (doar dacă au valori)
                 floors: formData.floors ? parseInt(formData.floors) : null,
                 numberOfRooms: formData.numberOfRooms ? parseInt(formData.numberOfRooms) : null,
                 hasReception: Boolean(formData.hasReception),
@@ -356,7 +157,7 @@ function CreateSpacePage() {
                 ceilingHeight: formData.ceilingHeight ? parseFloat(formData.ceilingHeight) : null,
                 hasLoadingDock: Boolean(formData.hasLoadingDock),
                 securityLevel: formData.securityLevel || 'MEDIUM',
-                // Send IDs directly instead of objects
+                // CRITICAL FIX: Send IDs directly instead of objects
                 ownerId: user.id,
                 buildingId: parseInt(formData.buildingId)
             };
@@ -403,12 +204,10 @@ function CreateSpacePage() {
             } else {
                 setError('Nu s-a putut crea spațiul. Verificați datele introduse și încercați din nou.');
             }
-        } finally {
-            setIsSubmitting(false);
+            setLoading(false);
         }
     };
 
-    // Render fields specific to the selected space type
     const renderTypeSpecificFields = () => {
         switch (formData.spaceType) {
             case 'OFFICE':
@@ -416,33 +215,28 @@ function CreateSpacePage() {
                     <div className="form-section">
                         <h3>Detalii Birou</h3>
                         <div className="form-row">
-                            <ValidatedInput
-                                type="number"
-                                name="floors"
-                                value={formData.floors}
-                                onChange={(e) => handleChange('floors', e.target.value)}
-                                onBlur={() => handleBlur('floors')}
-                                error={errors.floors}
-                                label="Număr de etaje"
-                                placeholder="Ex: 2"
-                                min="1"
-                                max="50"
-                                disabled={isSubmitting}
-                            />
-
-                            <ValidatedInput
-                                type="number"
-                                name="numberOfRooms"
-                                value={formData.numberOfRooms}
-                                onChange={(e) => handleChange('numberOfRooms', e.target.value)}
-                                onBlur={() => handleBlur('numberOfRooms')}
-                                error={errors.numberOfRooms}
-                                label="Număr de camere"
-                                placeholder="Ex: 5"
-                                min="1"
-                                max="100"
-                                disabled={isSubmitting}
-                            />
+                            <div className="form-group">
+                                <label htmlFor="floors">Număr de etaje:</label>
+                                <input
+                                    type="number"
+                                    id="floors"
+                                    name="floors"
+                                    min="1"
+                                    value={formData.floors}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="numberOfRooms">Număr de camere:</label>
+                                <input
+                                    type="number"
+                                    id="numberOfRooms"
+                                    name="numberOfRooms"
+                                    min="1"
+                                    value={formData.numberOfRooms}
+                                    onChange={handleChange}
+                                />
+                            </div>
                         </div>
                         <div className="form-group checkbox">
                             <label>
@@ -450,8 +244,7 @@ function CreateSpacePage() {
                                     type="checkbox"
                                     name="hasReception"
                                     checked={formData.hasReception}
-                                    onChange={(e) => handleChange('hasReception', e.target.checked)}
-                                    disabled={isSubmitting}
+                                    onChange={handleChange}
                                 />
                                 Are zonă de recepție
                             </label>
@@ -463,34 +256,29 @@ function CreateSpacePage() {
                     <div className="form-section">
                         <h3>Detalii Spațiu Comercial</h3>
                         <div className="form-row">
-                            <ValidatedInput
-                                type="number"
-                                name="shopWindowSize"
-                                value={formData.shopWindowSize}
-                                onChange={(e) => handleChange('shopWindowSize', e.target.value)}
-                                onBlur={() => handleBlur('shopWindowSize')}
-                                error={errors.shopWindowSize}
-                                label="Dimensiune vitrină (m)"
-                                placeholder="Ex: 3.5"
-                                step="0.1"
-                                min="0"
-                                max="50"
-                                disabled={isSubmitting}
-                            />
-
-                            <ValidatedInput
-                                type="number"
-                                name="maxOccupancy"
-                                value={formData.maxOccupancy}
-                                onChange={(e) => handleChange('maxOccupancy', e.target.value)}
-                                onBlur={() => handleBlur('maxOccupancy')}
-                                error={errors.maxOccupancy}
-                                label="Capacitate maximă (persoane)"
-                                placeholder="Ex: 50"
-                                min="0"
-                                max="1000"
-                                disabled={isSubmitting}
-                            />
+                            <div className="form-group">
+                                <label htmlFor="shopWindowSize">Dimensiune vitrină (m):</label>
+                                <input
+                                    type="number"
+                                    id="shopWindowSize"
+                                    name="shopWindowSize"
+                                    step="0.1"
+                                    min="0"
+                                    value={formData.shopWindowSize}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="maxOccupancy">Capacitate maximă (persoane):</label>
+                                <input
+                                    type="number"
+                                    id="maxOccupancy"
+                                    name="maxOccupancy"
+                                    min="0"
+                                    value={formData.maxOccupancy}
+                                    onChange={handleChange}
+                                />
+                            </div>
                         </div>
                         <div className="form-group checkbox">
                             <label>
@@ -498,8 +286,7 @@ function CreateSpacePage() {
                                     type="checkbox"
                                     name="hasCustomerEntrance"
                                     checked={formData.hasCustomerEntrance}
-                                    onChange={(e) => handleChange('hasCustomerEntrance', e.target.checked)}
-                                    disabled={isSubmitting}
+                                    onChange={handleChange}
                                 />
                                 Are intrare separată pentru clienți
                             </label>
@@ -511,35 +298,31 @@ function CreateSpacePage() {
                     <div className="form-section">
                         <h3>Detalii Depozit</h3>
                         <div className="form-row">
-                            <ValidatedInput
-                                type="number"
-                                name="ceilingHeight"
-                                value={formData.ceilingHeight}
-                                onChange={(e) => handleChange('ceilingHeight', e.target.value)}
-                                onBlur={() => handleBlur('ceilingHeight')}
-                                error={errors.ceilingHeight}
-                                label="Înălțime tavan (m)"
-                                placeholder="Ex: 4.5"
-                                step="0.1"
-                                min="0"
-                                max="30"
-                                disabled={isSubmitting}
-                            />
-
-                            <ValidatedSelect
-                                name="securityLevel"
-                                value={formData.securityLevel}
-                                onChange={(e) => handleChange('securityLevel', e.target.value)}
-                                onBlur={() => handleBlur('securityLevel')}
-                                error={errors.securityLevel}
-                                label="Nivel de securitate"
-                                disabled={isSubmitting}
-                                options={[
-                                    { value: 'LOW', label: 'Scăzut' },
-                                    { value: 'MEDIUM', label: 'Mediu' },
-                                    { value: 'HIGH', label: 'Ridicat' }
-                                ]}
-                            />
+                            <div className="form-group">
+                                <label htmlFor="ceilingHeight">Înălțime tavan (m):</label>
+                                <input
+                                    type="number"
+                                    id="ceilingHeight"
+                                    name="ceilingHeight"
+                                    step="0.1"
+                                    min="0"
+                                    value={formData.ceilingHeight}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="securityLevel">Nivel de securitate:</label>
+                                <select
+                                    id="securityLevel"
+                                    name="securityLevel"
+                                    value={formData.securityLevel}
+                                    onChange={handleChange}
+                                >
+                                    <option value="LOW">Scăzut</option>
+                                    <option value="MEDIUM">Mediu</option>
+                                    <option value="HIGH">Ridicat</option>
+                                </select>
+                            </div>
                         </div>
                         <div className="form-group checkbox">
                             <label>
@@ -547,8 +330,7 @@ function CreateSpacePage() {
                                     type="checkbox"
                                     name="hasLoadingDock"
                                     checked={formData.hasLoadingDock}
-                                    onChange={(e) => handleChange('hasLoadingDock', e.target.checked)}
-                                    disabled={isSubmitting}
+                                    onChange={handleChange}
                                 />
                                 Are rampă de încărcare
                             </label>
@@ -560,7 +342,6 @@ function CreateSpacePage() {
         }
     };
 
-    // Check if user is authorized
     if (!user || (user.role !== 'OWNER' && user.role !== 'ADMIN')) {
         return <div className="loading-container">Redirecționare...</div>;
     }
@@ -579,149 +360,127 @@ function CreateSpacePage() {
             <form onSubmit={handleSubmit} className="create-space-form">
                 <div className="form-section">
                     <h3>Informații de Bază</h3>
-
-                    <ValidatedInput
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={(e) => handleChange('name', e.target.value)}
-                        onBlur={() => handleBlur('name')}
-                        error={touched.name ? errors.name : ''}
-                        label="Denumire Spațiu"
-                        placeholder="Ex: Birou modern în centrul orașului"
-                        required
-                        disabled={isSubmitting}
-                    />
-
-                    <ValidatedTextarea
-                        name="description"
-                        value={formData.description}
-                        onChange={(e) => handleChange('description', e.target.value)}
-                        onBlur={() => handleBlur('description')}
-                        error={touched.description ? errors.description : ''}
-                        label="Descriere"
-                        placeholder="Descrierea detaliată a spațiului..."
-                        rows={4}
-                        maxLength={1000}
-                        showCharCount={true}
-                        disabled={isSubmitting}
-                    />
-
-                    <div className="form-row">
-                        <ValidatedInput
-                            type="number"
-                            name="area"
-                            value={formData.area}
-                            onChange={(e) => handleChange('area', e.target.value)}
-                            onBlur={() => handleBlur('area')}
-                            error={touched.area ? errors.area : ''}
-                            label="Suprafață (m²)"
-                            placeholder="Ex: 50"
-                            step="0.01"
-                            min="0"
-                            max="10000"
+                    <div className="form-group">
+                        <label htmlFor="name">Denumire Spațiu *</label>
+                        <input
+                            type="text"
+                            id="name"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleChange}
                             required
-                            disabled={isSubmitting}
-                        />
-
-                        <ValidatedInput
-                            type="number"
-                            name="pricePerMonth"
-                            value={formData.pricePerMonth}
-                            onChange={(e) => handleChange('pricePerMonth', e.target.value)}
-                            onBlur={() => handleBlur('pricePerMonth')}
-                            error={touched.pricePerMonth ? errors.pricePerMonth : ''}
-                            label="Preț lunar (€)"
-                            placeholder="Ex: 500"
-                            min="0"
-                            max="100000"
-                            required
-                            disabled={isSubmitting}
                         />
                     </div>
-
-                    <ValidatedSelect
-                        name="spaceType"
-                        value={formData.spaceType}
-                        onChange={(e) => handleChange('spaceType', e.target.value)}
-                        onBlur={() => handleBlur('spaceType')}
-                        error={touched.spaceType ? errors.spaceType : ''}
-                        label="Tip Spațiu"
-                        required
-                        disabled={isSubmitting}
-                        options={[
-                            { value: 'OFFICE', label: 'Birou' },
-                            { value: 'RETAIL', label: 'Spațiu Comercial' },
-                            { value: 'WAREHOUSE', label: 'Depozit' }
-                        ]}
-                    />
+                    <div className="form-group">
+                        <label htmlFor="description">Descriere</label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            value={formData.description}
+                            onChange={handleChange}
+                            rows="4"
+                        />
+                    </div>
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label htmlFor="area">Suprafață (m²) *</label>
+                            <input
+                                type="number"
+                                id="area"
+                                name="area"
+                                step="0.01"
+                                min="0"
+                                value={formData.area}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="pricePerMonth">Preț lunar (€) *</label>
+                            <input
+                                type="number"
+                                id="pricePerMonth"
+                                name="pricePerMonth"
+                                min="0"
+                                value={formData.pricePerMonth}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="spaceType">Tip Spațiu *</label>
+                        <select
+                            id="spaceType"
+                            name="spaceType"
+                            value={formData.spaceType}
+                            onChange={handleChange}
+                            required
+                        >
+                            <option value="OFFICE">Birou</option>
+                            <option value="RETAIL">Spațiu Comercial</option>
+                            <option value="WAREHOUSE">Depozit</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div className="form-section">
                     <h3>Locație</h3>
-
-                    <ValidatedSelect
-                        name="buildingId"
-                        value={formData.buildingId}
-                        onChange={(e) => handleChange('buildingId', e.target.value)}
-                        onBlur={() => handleBlur('buildingId')}
-                        error={touched.buildingId ? errors.buildingId : ''}
-                        label="Clădire"
-                        required
-                        disabled={isSubmitting}
-                        placeholder="Selectează o clădire..."
-                        options={buildings.map(building => ({
-                            value: building.id,
-                            label: `${building.name} - ${building.address}`
-                        }))}
-                    />
-
-                    <ValidatedInput
-                        type="text"
-                        name="address"
-                        value={formData.address}
-                        onChange={(e) => handleChange('address', e.target.value)}
-                        onBlur={() => handleBlur('address')}
-                        error={touched.address ? errors.address : ''}
-                        label="Adresă/Detalii Locație"
-                        placeholder="Ex: Etaj 3, Aripa Est"
-                        disabled={isSubmitting}
-                    />
-
+                    <div className="form-group">
+                        <label htmlFor="buildingId">Clădire *</label>
+                        <select
+                            id="buildingId"
+                            name="buildingId"
+                            value={formData.buildingId}
+                            onChange={handleChange}
+                            required
+                        >
+                            <option value="">Selectează o clădire...</option>
+                            {buildings.map(building => (
+                                <option key={building.id} value={building.id}>
+                                    {building.name} - {building.address}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="address">Adresă/Detalii Locație</label>
+                        <input
+                            type="text"
+                            id="address"
+                            name="address"
+                            value={formData.address}
+                            onChange={handleChange}
+                            placeholder="Ex: Etaj 3, Aripa Est"
+                        />
+                    </div>
                     <div className="form-row">
-                        <ValidatedInput
-                            type="number"
-                            name="latitude"
-                            value={formData.latitude}
-                            onChange={(e) => handleChange('latitude', e.target.value)}
-                            onBlur={() => handleBlur('latitude')}
-                            error={touched.latitude ? (errors.latitude || errors.coordinates) : ''}
-                            label="Latitudine"
-                            placeholder="Ex: 46.7712"
-                            step="0.000001"
-                            min="-90"
-                            max="90"
-                            disabled={isSubmitting}
-                        />
-
-                        <ValidatedInput
-                            type="number"
-                            name="longitude"
-                            value={formData.longitude}
-                            onChange={(e) => handleChange('longitude', e.target.value)}
-                            onBlur={() => handleBlur('longitude')}
-                            error={touched.longitude ? (errors.longitude || errors.coordinates) : ''}
-                            label="Longitudine"
-                            placeholder="Ex: 23.6236"
-                            step="0.000001"
-                            min="-180"
-                            max="180"
-                            disabled={isSubmitting}
-                        />
+                        <div className="form-group">
+                            <label htmlFor="latitude">Latitudine</label>
+                            <input
+                                type="number"
+                                id="latitude"
+                                name="latitude"
+                                step="0.000001"
+                                value={formData.latitude}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="longitude">Longitudine</label>
+                            <input
+                                type="number"
+                                id="longitude"
+                                name="longitude"
+                                step="0.000001"
+                                value={formData.longitude}
+                                onChange={handleChange}
+                            />
+                        </div>
                     </div>
                 </div>
 
-                {/* Display fields specific to the selected space type */}
+                {/* Afișează câmpurile specifice tipului de spațiu selectat */}
                 {renderTypeSpecificFields()}
 
                 <div className="form-section">
@@ -734,9 +493,8 @@ function CreateSpacePage() {
                                         type="checkbox"
                                         name="amenities"
                                         value={amenity.label}
-                                        checked={(formData.amenities || []).includes(amenity.label)}
+                                        checked={formData.amenities.includes(amenity.label)}
                                         onChange={handleAmenityChange}
-                                        disabled={isSubmitting}
                                     />
                                     {amenity.label}
                                 </label>
@@ -753,8 +511,7 @@ function CreateSpacePage() {
                                 type="checkbox"
                                 name="available"
                                 checked={formData.available}
-                                onChange={(e) => handleChange('available', e.target.checked)}
-                                disabled={isSubmitting}
+                                onChange={handleChange}
                             />
                             Disponibil pentru închiriere
                         </label>
@@ -765,15 +522,15 @@ function CreateSpacePage() {
                     <button
                         type="submit"
                         className="btn btn-save"
-                        disabled={isSubmitting || Object.keys(errors).length > 0}
+                        disabled={loading}
                     >
-                        {isSubmitting ? 'Se creează...' : 'Creează Spațiu'}
+                        {loading ? 'Se creează...' : 'Creează Spațiu'}
                     </button>
                     <button
                         type="button"
                         className="btn btn-cancel"
                         onClick={() => navigate('/spaces')}
-                        disabled={isSubmitting}
+                        disabled={loading}
                     >
                         Anulează
                     </button>

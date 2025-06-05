@@ -21,14 +21,21 @@ const mainInstance = axios.create({
     }
 });
 
-// Funcție care alege instanța Axios corectă în funcție de endpoint
-export const getAxiosInstance = (endpoint) => {
-    if (endpoint.includes('/login') || endpoint.includes('/register') || endpoint.includes('/auth')) {
-        return authInstance;
+// Interceptor pentru instanța auth
+authInstance.interceptors.request.use(
+    request => {
+        const authToken = localStorage.getItem("authToken");
+        if (authToken) {
+            request.headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        return request;
+    },
+    error => {
+        return Promise.reject(error);
     }
-    return mainInstance;
-};
+);
 
+// Interceptor pentru instanța main
 mainInstance.interceptors.request.use(
     request => {
         const authToken = localStorage.getItem("authToken");
@@ -41,5 +48,13 @@ mainInstance.interceptors.request.use(
         return Promise.reject(error);
     }
 );
+
+// Funcție care alege instanța Axios corectă în funcție de endpoint
+export const getAxiosInstance = (endpoint) => {
+    if (endpoint.includes('/login') || endpoint.includes('/register') || endpoint.includes('/auth')) {
+        return authInstance;
+    }
+    return mainInstance;
+};
 
 export { authInstance, mainInstance };

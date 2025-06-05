@@ -9,25 +9,44 @@ function ConfirmContractPage() {
     const [contract, setContract] = useState(null);
     const [space, setSpace] = useState(null);
     const [isDataMissing, setIsDataMissing] = useState(false);
-    const [countdown, setCountdown] = useState(10);
+    const [countdown, setCountdown] = useState(5); // Am schimbat la 5 pentru că în UI ai 5 secunde
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         // Verifică dacă există date necesare în state
         if (!location.state || !location.state.contract || !location.state.space) {
             setIsDataMissing(true);
+            setIsLoading(false);
+            return;
         }
 
         setContract(location.state.contract);
         setSpace(location.state.space);
-        setIsLoading(false); // Datele au fost încărcate
-    }, [location, navigate, countdown]);
+        setIsLoading(false);
+    }, [location.state]); // Am păstrat doar location.state în dependențe
+
+    // useEffect separat pentru countdown când datele lipsesc
+    useEffect(() => {
+        if (isDataMissing && countdown > 0) {
+            const timer = setTimeout(() => {
+                setCountdown(countdown - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        } else if (isDataMissing && countdown === 0) {
+            navigate('/'); // sau unde vrei să redirecționezi
+        }
+    }, [isDataMissing, countdown, navigate]);
 
     const handleViewContracts = () => {
         navigate('/contracts');
     };
 
     const handleDownloadContract = () => {
+        if (!contract || !space) {
+            alert("Informațiile contractului nu sunt disponibile.");
+            return;
+        }
+
         console.log(contract.paymentMethod);
         try {
             const doc = new jsPDF();
@@ -51,7 +70,7 @@ function ConfirmContractPage() {
             doc.text("DETALII CONTRACT:", 20, 70);
 
             doc.setFontSize(10);
-            doc.text("Număr Contract: " + contract.contractNumber, 25, 80);
+            doc.text("Numărul Contract: " + contract.contractNumber, 25, 80);
             doc.text("Perioadă: " + contract.startDate + " - " + contract.endDate, 25, 87);
             doc.text("Chirie Lunară: " + contract.monthlyRent + " €", 25, 94);
             doc.text("Garanție: " + contract.securityDeposit + " €", 25, 101);
@@ -91,13 +110,12 @@ function ConfirmContractPage() {
                     <i className="error-icon">⚠️</i>
                     <h2>Informații lipsă</h2>
                     <p>Nu s-au găsit informațiile necesare pentru afișarea confirmării contractului.</p>
-                    <p>Veți fi redirecționat în 5 secunde...</p>
+                    <p>Veți fi redirecționat în {countdown} secunde...</p>
                 </div>
             </div>
         );
     }
 
-    // Adăugăm verificare pentru loading
     if (isLoading) {
         return (
             <div className="contract-confirmation-container">
@@ -108,7 +126,6 @@ function ConfirmContractPage() {
         );
     }
 
-    // Acum suntem siguri că space și contract nu sunt null
     return (
         <div className="contract-confirmation-container">
             <div className="confirmation-card">

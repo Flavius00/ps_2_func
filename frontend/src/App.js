@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './Login';
+import RegisterPage from './RegisterPage';
 import HomePage from './HomePage';
 import SpacesPage from './SpacesPage';
 import ContractsPage from './ContractsPage';
@@ -34,6 +35,7 @@ function App() {
         <Router>
             <Routes>
                 <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login setUser={setUser} />} />
+                <Route path="/register" element={user ? <Navigate to="/home" replace /> : <RegisterPage />} />
                 <Route path="/home" element={user ? <HomePage setUser={setUser} /> : <Navigate to="/login" />} />
                 <Route path="/spaces" element={user ? <SpacesPage /> : <Navigate to="/login" />} />
                 <Route path="/spaces/create" element={user ? <CreateSpacePage /> : <Navigate to="/login" />} />

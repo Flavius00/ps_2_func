@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
 import { authInstance } from './helper/axios';
+import { useNavigate, Link } from 'react-router-dom';
 import './LoginPage.css';
 
 function Login({ setUser }) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
 
     const handleLogin = async (e) => {
         e.preventDefault();
+        setError('');
+        setIsLoading(true);
+
         try {
             const response = await authInstance.post('/auth/login', {
                 username,
                 password
             });
 
-            if (response.data) {
+            if (response.data && response.data.success) {
                 // Salvează utilizatorul în localStorage
                 localStorage.setItem('user', JSON.stringify(response.data));
 
@@ -24,12 +30,19 @@ function Login({ setUser }) {
 
                 // Actualizează starea utilizatorului în aplicație
                 setUser(response.data);
+                navigate('/home');
             } else {
                 setError('Credențiale invalide');
             }
         } catch (error) {
             console.error(error);
-            setError('Autentificare eșuată. Vă rugăm verificați credențialele.');
+            if (error.response && error.response.data) {
+                setError(error.response.data.message || 'Autentificare eșuată. Vă rugăm verificați credențialele.');
+            } else {
+                setError('Autentificare eșuată. Vă rugăm verificați credențialele.');
+            }
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -44,6 +57,7 @@ function Login({ setUser }) {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         required
+                        disabled={isLoading}
                     />
                 </div>
                 <div className="form-group">
@@ -53,10 +67,16 @@ function Login({ setUser }) {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
+                        disabled={isLoading}
                     />
                 </div>
                 {error && <div className="error-message">{error}</div>}
-                <button type="submit">Autentificare</button>
+                <button type="submit" disabled={isLoading}>
+                    {isLoading ? 'Se procesează...' : 'Autentificare'}
+                </button>
+                <div className="register-link">
+                    Nu ai cont? <Link to="/register">Înregistrează-te</Link>
+                </div>
                 <div className="login-helper">
                     <p>Conturi demo:</p>
                     <ul>
