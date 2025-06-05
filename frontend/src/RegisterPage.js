@@ -75,6 +75,11 @@ function RegisterPage() {
                     error = 'Adresa nu poate depăși 500 de caractere';
                 }
                 break;
+            case 'role':
+                if (!value) {
+                    error = 'Tipul contului este obligatoriu';
+                }
+                break;
             default:
                 break;
         }
@@ -84,6 +89,8 @@ function RegisterPage() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        console.log(`Field changed: ${name} = ${value}`); // Debug log
+
         setFormData({ ...formData, [name]: value });
 
         // Validate field
@@ -137,6 +144,17 @@ function RegisterPage() {
 
         setIsSubmitting(true);
 
+        // Log the data being sent for debugging
+        console.log("Registration data being sent:", {
+            name: formData.name,
+            email: formData.email,
+            username: formData.username,
+            password: "********", // Don't log the actual password
+            phone: formData.phone || null,
+            address: formData.address || null,
+            role: formData.role
+        });
+
         try {
             const response = await authInstance.post('/auth/register', {
                 name: formData.name,
@@ -145,8 +163,10 @@ function RegisterPage() {
                 password: formData.password,
                 phone: formData.phone || null,
                 address: formData.address || null,
-                role: formData.role
+                role: formData.role // Make sure this field is included
             });
+
+            console.log("Registration response:", response.data); // Debug log
 
             if (response.data && response.data.success) {
                 // Registration successful
@@ -162,6 +182,8 @@ function RegisterPage() {
             if (error.response) {
                 // The request was made and the server responded with a status code
                 // that falls out of the range of 2xx
+                console.error('Error response:', error.response.data); // Debug log
+
                 if (error.response.status === 409) {
                     // Conflict - usually means username or email already exists
                     const fieldError = error.response.data?.field;
@@ -177,6 +199,7 @@ function RegisterPage() {
                 }
             } else if (error.request) {
                 // The request was made but no response was received
+                console.error('No response received:', error.request); // Debug log
                 setServerError('Nu s-a primit răspuns de la server. Verificați conexiunea la internet.');
             } else {
                 // Something happened in setting up the request that triggered an Error
@@ -329,10 +352,12 @@ function RegisterPage() {
                             value={formData.role}
                             onChange={handleChange}
                             disabled={isSubmitting}
+                            className={errors.role ? 'error' : ''}
                         >
                             <option value="TENANT">Chiriaș</option>
                             <option value="OWNER">Proprietar</option>
                         </select>
+                        {errors.role && <div className="error-message">{errors.role}</div>}
                     </div>
 
                     <button type="submit" className="register-button" disabled={isSubmitting}>

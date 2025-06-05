@@ -1,3 +1,4 @@
+// Soluția 1: Modifică User.java - fă proprietatea role read-only
 package com.example.demo.model;
 
 import lombok.*;
@@ -12,7 +13,7 @@ import jakarta.persistence.*;
 @Getter
 @Setter
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "user_type", discriminatorType = DiscriminatorType.STRING)
+@DiscriminatorColumn(name = "role", discriminatorType = DiscriminatorType.STRING)
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,8 +38,9 @@ public class User {
 
     private String profilePictureUrl;
 
+    // MODIFICAREA CHEIE: Fă proprietatea role read-only
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "role", insertable = false, updatable = false)
     private UserRole role;
 
     public enum UserRole {

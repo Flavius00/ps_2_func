@@ -50,7 +50,10 @@ public class UserMapper {
             return null;
         }
 
-        return User.builder()
+        // Log the role value received from frontend for debugging
+        System.out.println("UserMapper: Creating user from DTO with role: " + dto.getRole());
+
+        User user = User.builder()
                 .name(dto.getName())
                 .email(dto.getEmail())
                 .username(dto.getUsername())
@@ -60,6 +63,11 @@ public class UserMapper {
                 .profilePictureUrl(dto.getProfilePictureUrl())
                 .role(dto.getRole())
                 .build();
+
+        // Double-check that role is properly set
+        System.out.println("UserMapper: User created with role: " + user.getRole());
+
+        return user;
     }
 
     public void updateUserFromDTO(User user, UserDTO dto) {

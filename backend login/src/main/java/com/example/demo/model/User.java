@@ -38,7 +38,7 @@ public class User {
     private String profilePictureUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, name = "role")  // Explicitly name the column to ensure consistency
     private UserRole role;
 
     public enum UserRole {

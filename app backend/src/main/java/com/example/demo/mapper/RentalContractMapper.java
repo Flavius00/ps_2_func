@@ -2,15 +2,20 @@ package com.example.demo.mapper;
 
 import com.example.demo.dto.RentalContractDto;
 import com.example.demo.dto.RentalContractCreateDto;
+import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.model.RentalContract;
 import com.example.demo.model.ComercialSpace;
 import com.example.demo.model.Tenant;
+import com.example.demo.model.User;
 import com.example.demo.repository.ComercialSpaceRepository;
 import com.example.demo.repository.TenantRepository;
+import com.example.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 @Component
 public class RentalContractMapper {
@@ -163,12 +168,32 @@ public class RentalContractMapper {
                 .orElseThrow(() -> new RuntimeException("Space not found with id: " + spaceId));
     }
 
+    @Autowired
+    private UserRepository userRepository;
+
     private Tenant tenantIdToTenant(Long tenantId) {
         if (tenantId == null) {
             return null;
         }
+
+        // Caută utilizatorul în repository-ul general
+        User user = userRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + tenantId));
+
+        // Verifică dacă are rolul de TENANT
+        if (user.getRole() != User.UserRole.TENANT) {
+            throw new RuntimeException("User with id " + tenantId + " is not a tenant. Role: " + user.getRole());
+        }
+
+        // Dacă este deja o instanță de Tenant, returnează-l
+        if (user instanceof Tenant) {
+            return (Tenant) user;
+        }
+
+        // Altfel, caută în TenantRepository (ar trebui să funcționeze după corectarea datelor)
         return tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new RuntimeException("Tenant not found with id: " + tenantId));
+                .orElseThrow(() -> new RuntimeException("Tenant entity not found for user id: " + tenantId +
+                        ". User_type inconsistency detected."));
     }
 
     private RentalContract.ContractStatus stringToContractStatus(String status) {

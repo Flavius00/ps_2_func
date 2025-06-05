@@ -40,4 +40,19 @@ public class RegisterRequestDTO {
 
     @NotNull(message = "Role is required")
     private User.UserRole role;
+
+    // Override toString to avoid printing the password
+    @Override
+    public String toString() {
+        return "RegisterRequestDTO{" +
+                "name='" + name + '\'' +
+                ", email='" + email + '\'' +
+                ", username='" + username + '\'' +
+                ", password='[PROTECTED]'" +
+                ", phone='" + phone + '\'' +
+                ", address='" + address + '\'' +
+                ", profilePictureUrl='" + profilePictureUrl + '\'' +
+                ", role=" + role +
+                '}';
+    }
 }

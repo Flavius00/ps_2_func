@@ -231,6 +231,8 @@ function RentalContractPage() {
     };
 
     // Handle contract submission
+    // Fix pentru RentalContractPage.js - handleSubmit method
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -241,13 +243,41 @@ function RentalContractPage() {
         setIsSubmitting(true);
 
         try {
+            // DEBUGGING: Verifică datele înainte de trimitere
+            console.log("=== FRONTEND CONTRACT DEBUG ===");
+            console.log("User:", user);
+            console.log("Space:", space);
+            console.log("User ID type:", typeof user.id, "Value:", user.id);
+            console.log("Space ID type:", typeof space.id, "Value:", space.id);
+
+            // CRITICAL FIX: Asigură-te că ID-urile sunt numere întregi
+            const spaceId = parseInt(space.id);
+            const tenantId = parseInt(user.id);
+
+            console.log("Space ID (parsed):", spaceId);
+            console.log("Tenant ID (parsed):", tenantId);
+
+            // Validează că parsing-ul a reușit
+            if (!spaceId || isNaN(spaceId)) {
+                throw new Error("Invalid space ID: " + space.id);
+            }
+
+            if (!tenantId || isNaN(tenantId)) {
+                throw new Error("Invalid tenant ID: " + user.id);
+            }
+
+            // Verifică că space-ul este disponibil
+            if (!space.available) {
+                throw new Error("Spațiul nu mai este disponibil pentru închiriere");
+            }
+
             const contractData = {
-                spaceId: space.id,
-                tenantId: user.id,
+                spaceId: spaceId,           // Trimite ca număr întreg
+                tenantId: tenantId,         // Trimite ca număr întreg
                 startDate: formattedStartDate,
                 endDate: formattedEndDate,
-                monthlyRent: pricing.monthlyRent,
-                securityDeposit: pricing.securityDeposit,
+                monthlyRent: parseFloat(pricing.monthlyRent.toFixed(2)),
+                securityDeposit: parseFloat(pricing.securityDeposit.toFixed(2)),
                 status: "ACTIVE",
                 isPaid: true,
                 dateCreated: formattedStartDate,
@@ -255,12 +285,21 @@ function RentalContractPage() {
                 notes: `Contract încheiat electronic. Metodă de plată: ${paymentMethod}. Durata: ${contractDuration} luni. Discount aplicat: ${pricing.discount}%. Economii: ${pricing.discountAmount}€. Strategie folosită: ${pricing.strategyName}. Semnătură: ${signatureData}`
             };
 
+            console.log("Final contract data to send:", contractData);
+            console.log("=== END FRONTEND DEBUG ===");
+
             const response = await axios.post('http://localhost:8080/contracts/create', contractData, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
 
+            console.log("Contract creation response:", response.data);
+
+            // Actualizează space-ul local să fie indisponibil
+            const updatedSpace = { ...space, available: false };
+
+            // Încearcă să actualizezi și space-ul pe server (non-blocking)
             try {
                 await axios.post('http://localhost:8080/spaces/update', {
                     id: space.id,
@@ -269,7 +308,7 @@ function RentalContractPage() {
                     area: space.area,
                     pricePerMonth: space.pricePerMonth,
                     address: space.address,
-                    available: false,
+                    available: false, // Marchează ca indisponibil
                     latitude: space.latitude,
                     longitude: space.longitude,
                     amenities: space.amenities,
@@ -283,13 +322,17 @@ function RentalContractPage() {
                     hasLoadingDock: space.hasLoadingDock,
                     securityLevel: space.securityLevel
                 });
+                console.log("Space availability updated successfully");
             } catch (spaceUpdateError) {
-                console.warn('Failed to update space availability:', spaceUpdateError);
+                console.warn('Failed to update space availability on frontend, but contract was created:', spaceUpdateError);
+                // Nu oprește flow-ul pentru că contractul a fost creat cu succes
             }
 
+            // Pregătește datele pentru pagina de confirmare
             const contractForConfirmation = {
                 ...contractData,
                 id: response.data.id,
+                contractNumber: response.data.contractNumber || contractData.contractNumber,
                 paymentMethod: paymentMethod,
                 signature: signatureData,
                 appliedDiscount: pricing.discount,
@@ -297,37 +340,56 @@ function RentalContractPage() {
                 strategyUsed: pricing.strategyName
             };
 
+            // Navighează la pagina de confirmare
             navigate('/payment/confirm', {
                 state: {
                     contract: contractForConfirmation,
-                    space: space
+                    space: updatedSpace
                 }
             });
 
         } catch (error) {
-            console.error('Error creating contract:', error);
+            console.error('=== FRONTEND CONTRACT CREATION ERROR ===');
+            console.error('Error type:', error.constructor.name);
+            console.error('Error message:', error.message);
+            console.error('Full error object:', error);
+
             if (error.response) {
-                if (error.response.status === 400) {
-                    if (error.response.data.errors) {
-                        const validationErrors = error.response.data.errors;
-                        const errorMessages = Object.entries(validationErrors)
+                console.error('Server response status:', error.response.status);
+                console.error('Server response data:', error.response.data);
+                console.error('Server response headers:', error.response.headers);
+            }
+            console.error('=== END FRONTEND ERROR ===');
+
+            // Enhanced error handling
+            if (error.response) {
+                const status = error.response.status;
+                const data = error.response.data;
+
+                if (status === 500) {
+                    setError('Eroare de server. Vă rugăm încercați din nou sau contactați suportul. Detalii: ' + (data.message || 'Eroare internă de server'));
+                } else if (status === 400) {
+                    if (data.errors) {
+                        const validationErrors = Object.entries(data.errors)
                             .map(([field, message]) => `${field}: ${message}`)
                             .join('\n');
-                        setError(`Erori de validare:\n${errorMessages}`);
-                    } else if (error.response.data.message) {
-                        setError(`Eroare: ${error.response.data.message}`);
+                        setError(`Erori de validare:\n${validationErrors}`);
+                    } else if (data.message) {
+                        setError(`Eroare: ${data.message}`);
                     } else {
                         setError('Datele contractului nu sunt valide. Vă rugăm verificați informațiile introduse.');
                     }
-                } else if (error.response.status === 404) {
-                    setError('Spațiul sau chiriașul nu a fost găsit. Vă rugăm reîncărcați pagina și încercați din nou.');
+                } else if (status === 404) {
+                    setError('Spațiul sau chiriașul nu a fost găsit în baza de date. Vă rugăm reîncărcați pagina.');
+                } else if (status === 409) {
+                    setError('Spațiul este deja închiriat sau există un conflict cu un alt contract.');
                 } else {
-                    setError(`Nu s-a putut crea contractul: ${error.response.data.message || 'Eroare de server'}`);
+                    setError(`Eroare server (${status}): ${data.message || 'Eroare nespecificată'}`);
                 }
             } else if (error.request) {
-                setError('Nu s-a putut conecta la server. Verificați conexiunea la internet.');
+                setError('Nu s-a putut conecta la server. Verificați conexiunea la internet și încercați din nou.');
             } else {
-                setError('A apărut o eroare neașteptată. Vă rugăm încercați din nou.');
+                setError('A apărut o eroare la pregătirea cererii: ' + error.message);
             }
         } finally {
             setIsSubmitting(false);

@@ -73,6 +73,15 @@ public class AuthServiceImpl implements AuthService {
         // Create user from DTO
         User user = userMapper.fromRegisterDTO(registerRequest);
 
+        // Make sure the role is properly set - this is important
+        if (user.getRole() == null) {
+            // Default to TENANT if role is not specified
+            user.setRole(User.UserRole.TENANT);
+        }
+
+        // Print debug information
+        System.out.println("AuthService: Registering user with role: " + user.getRole());
+
         // Criptează parola înainte de salvare
         String encodedPassword = passwordEncoder.encode(registerRequest.getPassword());
         user.setPassword(encodedPassword);
@@ -80,6 +89,7 @@ public class AuthServiceImpl implements AuthService {
         // Save and return
         User savedUser = userRepository.save(user);
         System.out.println("AuthService: User registered successfully with encrypted password: " + savedUser.getUsername());
+        System.out.println("AuthService: User role saved as: " + savedUser.getRole());
 
         return savedUser;
     }
