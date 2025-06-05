@@ -9,6 +9,8 @@ import org.springframework.context.annotation.ComponentScan;
 		"com.example.demo.controller",
 		"com.example.demo.service",
 		"com.example.demo.mapper",
+		"com.example.demo.config",
+		"com.example.demo.repository"
 })
 public class AuthServiceApplication {
 	public static void main(String[] args) {

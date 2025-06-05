@@ -547,3 +547,54 @@
         white-space: normal;
     }
 }
+.message-input-form {
+    padding: 1rem;
+    border-top: 1px solid #e9ecef;
+    background-color: #f8f9fa;
+}
+.input-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.message-input-field {
+    flex-grow: 1;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.3s ease;
+    resize: none;
+    min-height: auto;
+}
+
+.message-input-field:focus {
+    border-color: #3498db;
+}
+
+.message-input-field.error {
+    border-color: #e74c3c;
+}
+.message-send-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 20px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    white-space: nowrap;
+}
+
+.message-send-button:hover:not(:disabled) {
+    background-color: #2980b9;
+}
+
+.message-send-button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+

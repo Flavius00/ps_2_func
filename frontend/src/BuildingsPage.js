@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './BuildingsPage.css';
 
-// ADĂUGAT: Import-uri pentru validare
-import { useFormValidation } from './hooks/useFormValidation';
-import { buildingValidationRules, validateCoordinates } from './utils/validation';
+// Import validation components
 import ValidatedInput from './components/forms/ValidatedInput';
+import { validateCoordinates } from './utils/validation';
 
 function BuildingsPage() {
     const [buildings, setBuildings] = useState([]);
@@ -17,43 +16,25 @@ function BuildingsPage() {
     const [currentBuilding, setCurrentBuilding] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOption, setSortOption] = useState('name');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // ÎNLOCUIT: useState pentru formData cu useFormValidation
-    const {
-        values: formData,
-        errors,
-        touched,
-        isSubmitting,
-        handleChange,
-        handleBlur,
-        validateAllFields,
-        setSubmitting,
-        setFormValues,
-        resetForm
-    } = useFormValidation({
+    // Form state
+    const [formData, setFormData] = useState({
         name: '',
         address: '',
         totalFloors: 1,
         yearBuilt: 2000,
         latitude: 0,
         longitude: 0
-    }, {
-        ...buildingValidationRules,
-        // Validare specială pentru coordonate
-        coordinates: [() => {
-            const coordResult = validateCoordinates(formData.latitude, formData.longitude);
-            if (!coordResult.isValid) {
-                return {
-                    isValid: false,
-                    message: Object.values(coordResult.errors).join(', ')
-                };
-            }
-            return { isValid: true, message: '' };
-        }]
     });
+
+    // Validation state
+    const [errors, setErrors] = useState({});
+    const [touched, setTouched] = useState({});
 
     const navigate = useNavigate();
 
+    // Fetch buildings on component mount
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user'));
         setUser(storedUser);
@@ -71,11 +52,13 @@ function BuildingsPage() {
         fetchBuildings();
     }, []);
 
+    // Filter buildings when searchTerm, sortOption, or buildings change
     useEffect(() => {
         handleFilter();
     }, [searchTerm, sortOption, buildings]);
 
-    const handleFilter = () => {
+    // Filter and sort buildings
+    const handleFilter = useCallback(() => {
         let filtered = [...buildings];
 
         // Apply search filter
@@ -99,19 +82,143 @@ function BuildingsPage() {
         }
 
         setFilteredBuildings(filtered);
-    };
+    }, [buildings, searchTerm, sortOption]);
 
-    // ACTUALIZAT: handleCreateSubmit cu validare
+    // Handle form input changes
+    const handleChange = useCallback((name, value) => {
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+
+        // Mark field as touched
+        setTouched(prev => ({
+            ...prev,
+            [name]: true
+        }));
+    }, []);
+
+    // Handle input blur for validation
+    const handleBlur = useCallback((name) => {
+        setTouched(prev => ({
+            ...prev,
+            [name]: true
+        }));
+        validateField(name);
+    }, []);
+
+    // Validate a specific field
+    const validateField = useCallback((fieldName) => {
+        const newErrors = { ...errors };
+
+        switch (fieldName) {
+            case 'name':
+                if (!formData.name) {
+                    newErrors.name = 'Numele clădirii este obligatoriu';
+                } else if (formData.name.length < 3) {
+                    newErrors.name = 'Numele trebuie să aibă cel puțin 3 caractere';
+                } else {
+                    delete newErrors.name;
+                }
+                break;
+
+            case 'address':
+                if (!formData.address) {
+                    newErrors.address = 'Adresa este obligatorie';
+                } else if (formData.address.length < 5) {
+                    newErrors.address = 'Adresa trebuie să aibă cel puțin 5 caractere';
+                } else {
+                    delete newErrors.address;
+                }
+                break;
+
+            case 'totalFloors':
+                if (!formData.totalFloors) {
+                    newErrors.totalFloors = 'Numărul de etaje este obligatoriu';
+                } else if (formData.totalFloors < 1 || formData.totalFloors > 100) {
+                    newErrors.totalFloors = 'Numărul de etaje trebuie să fie între 1 și 100';
+                } else {
+                    delete newErrors.totalFloors;
+                }
+                break;
+
+            case 'yearBuilt':
+                const currentYear = new Date().getFullYear();
+                if (!formData.yearBuilt) {
+                    newErrors.yearBuilt = 'Anul construcției este obligatoriu';
+                } else if (formData.yearBuilt < 1800 || formData.yearBuilt > currentYear) {
+                    newErrors.yearBuilt = `Anul construcției trebuie să fie între 1800 și ${currentYear}`;
+                } else {
+                    delete newErrors.yearBuilt;
+                }
+                break;
+
+            case 'latitude':
+            case 'longitude':
+                // Validate coordinates together
+                const coordResult = validateCoordinates(formData.latitude, formData.longitude);
+                if (!coordResult.isValid) {
+                    newErrors.coordinates = Object.values(coordResult.errors).join(', ');
+                } else {
+                    delete newErrors.coordinates;
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    }, [formData, errors]);
+
+    // Validate all fields
+    const validateAllFields = useCallback(() => {
+        const fieldsToValidate = ['name', 'address', 'totalFloors', 'yearBuilt', 'latitude', 'longitude'];
+
+        // Mark all as touched
+        const newTouched = {};
+        fieldsToValidate.forEach(field => {
+            newTouched[field] = true;
+        });
+        setTouched(prev => ({ ...prev, ...newTouched }));
+
+        // Validate each field
+        let isValid = true;
+        fieldsToValidate.forEach(field => {
+            if (!validateField(field)) {
+                isValid = false;
+            }
+        });
+
+        return isValid;
+    }, [validateField]);
+
+    // Reset form
+    const resetForm = useCallback(() => {
+        setFormData({
+            name: '',
+            address: '',
+            totalFloors: 1,
+            yearBuilt: 2000,
+            latitude: 0,
+            longitude: 0
+        });
+        setErrors({});
+        setTouched({});
+    }, []);
+
+    // Create new building
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
 
-        // Validează toate câmpurile
+        // Validate all fields
         if (!validateAllFields()) {
             alert('Te rugăm să corectezi erorile din formular înainte de a continua.');
             return;
         }
 
-        setSubmitting(true);
+        setIsSubmitting(true);
 
         try {
             const response = await axios.post('http://localhost:8080/buildings', formData);
@@ -127,21 +234,21 @@ function BuildingsPage() {
                 alert('Eroare la adăugarea clădirii.');
             }
         } finally {
-            setSubmitting(false);
+            setIsSubmitting(false);
         }
     };
 
-    // ACTUALIZAT: handleUpdateSubmit cu validare
+    // Update existing building
     const handleUpdateSubmit = async (e) => {
         e.preventDefault();
 
-        // Validează toate câmpurile
+        // Validate all fields
         if (!validateAllFields()) {
             alert('Te rugăm să corectezi erorile din formular înainte de a continua.');
             return;
         }
 
-        setSubmitting(true);
+        setIsSubmitting(true);
 
         try {
             const response = await axios.put(`http://localhost:8080/buildings/${currentBuilding.id}`, formData);
@@ -161,10 +268,11 @@ function BuildingsPage() {
                 alert('Eroare la actualizarea clădirii.');
             }
         } finally {
-            setSubmitting(false);
+            setIsSubmitting(false);
         }
     };
 
+    // Delete building
     const handleDelete = async (buildingId) => {
         if (window.confirm('Sigur doriți să ștergeți această clădire?')) {
             try {
@@ -178,10 +286,10 @@ function BuildingsPage() {
         }
     };
 
-    // ACTUALIZAT: handleEdit cu setarea valorilor în formularul de validare
+    // Set form data for editing
     const handleEdit = (building) => {
         setCurrentBuilding(building);
-        setFormValues({
+        setFormData({
             name: building.name,
             address: building.address,
             totalFloors: building.totalFloors,
@@ -193,7 +301,7 @@ function BuildingsPage() {
         setIsCreating(false);
     };
 
-    // ACTUALIZAT: handleCancel
+    // Cancel form
     const handleCancel = () => {
         setIsCreating(false);
         setIsEditing(false);
@@ -201,6 +309,7 @@ function BuildingsPage() {
         resetForm();
     };
 
+    // View spaces in a building
     const handleViewSpaces = (buildingId) => {
         navigate('/spaces', { state: { buildingFilter: buildingId } });
     };
@@ -227,14 +336,13 @@ function BuildingsPage() {
                     <div className="building-form">
                         <h3>{isCreating ? 'Adaugă clădire nouă' : 'Editează clădire'}</h3>
                         <form onSubmit={isCreating ? handleCreateSubmit : handleUpdateSubmit}>
-                            {/* ÎNLOCUIT: Input-urile clasice cu ValidatedInput */}
                             <ValidatedInput
                                 type="text"
                                 name="name"
                                 value={formData.name}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                error={errors.name}
+                                onChange={(e) => handleChange('name', e.target.value)}
+                                onBlur={() => handleBlur('name')}
+                                error={touched.name ? errors.name : ''}
                                 label="Nume clădire"
                                 placeholder="Ex: Business Center Plaza"
                                 required
@@ -245,9 +353,9 @@ function BuildingsPage() {
                                 type="text"
                                 name="address"
                                 value={formData.address}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                error={errors.address}
+                                onChange={(e) => handleChange('address', e.target.value)}
+                                onBlur={() => handleBlur('address')}
+                                error={touched.address ? errors.address : ''}
                                 label="Adresă"
                                 placeholder="Ex: Str. Memorandumului nr. 28, Cluj-Napoca"
                                 required
@@ -259,9 +367,9 @@ function BuildingsPage() {
                                     type="number"
                                     name="totalFloors"
                                     value={formData.totalFloors}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    error={errors.totalFloors}
+                                    onChange={(e) => handleChange('totalFloors', e.target.value)}
+                                    onBlur={() => handleBlur('totalFloors')}
+                                    error={touched.totalFloors ? errors.totalFloors : ''}
                                     label="Număr etaje"
                                     placeholder="Ex: 5"
                                     min="1"
@@ -273,9 +381,9 @@ function BuildingsPage() {
                                     type="number"
                                     name="yearBuilt"
                                     value={formData.yearBuilt}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    error={errors.yearBuilt}
+                                    onChange={(e) => handleChange('yearBuilt', e.target.value)}
+                                    onBlur={() => handleBlur('yearBuilt')}
+                                    error={touched.yearBuilt ? errors.yearBuilt : ''}
                                     label="An construcție"
                                     placeholder="Ex: 2020"
                                     min="1800"
@@ -289,9 +397,9 @@ function BuildingsPage() {
                                     type="number"
                                     name="latitude"
                                     value={formData.latitude}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    error={errors.latitude || (errors.coordinates && errors.coordinates.includes('Latitudine') ? errors.coordinates : '')}
+                                    onChange={(e) => handleChange('latitude', e.target.value)}
+                                    onBlur={() => handleBlur('latitude')}
+                                    error={touched.latitude ? (errors.latitude || errors.coordinates) : ''}
                                     label="Latitudine"
                                     placeholder="Ex: 46.7712"
                                     step="0.000001"
@@ -304,9 +412,9 @@ function BuildingsPage() {
                                     type="number"
                                     name="longitude"
                                     value={formData.longitude}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    error={errors.longitude || (errors.coordinates && errors.coordinates.includes('Longitudine') ? errors.coordinates : '')}
+                                    onChange={(e) => handleChange('longitude', e.target.value)}
+                                    onBlur={() => handleBlur('longitude')}
+                                    error={touched.longitude ? (errors.longitude || errors.coordinates) : ''}
                                     label="Longitudine"
                                     placeholder="Ex: 23.6236"
                                     step="0.000001"
@@ -320,7 +428,7 @@ function BuildingsPage() {
                                 <button
                                     type="submit"
                                     className="btn btn-save"
-                                    disabled={isSubmitting || !validateAllFields()}
+                                    disabled={isSubmitting || Object.keys(errors).length > 0}
                                 >
                                     {isSubmitting ? 'Se procesează...' : (isCreating ? 'Adaugă' : 'Actualizează')}
                                 </button>

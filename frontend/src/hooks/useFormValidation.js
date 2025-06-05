@@ -1,7 +1,7 @@
 // frontend/src/hooks/useFormValidation.js
 // Custom hook pentru gestionarea validării formularelor
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { validateForm, validateFieldOnChange } from '../utils/validation';
 
 export const useFormValidation = (initialValues, validationRules) => {
@@ -9,6 +9,9 @@ export const useFormValidation = (initialValues, validationRules) => {
     const [errors, setErrors] = useState({});
     const [touched, setTouched] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // FIXED: Memorizăm validationRules pentru a evita re-crearea la fiecare render
+    const memoizedValidationRules = useMemo(() => validationRules, []);
 
     // Actualizează valoarea unui câmp și validează-l
     const handleChange = useCallback((name, value) => {
@@ -18,14 +21,17 @@ export const useFormValidation = (initialValues, validationRules) => {
         }));
 
         // Validează câmpul în timp real doar dacă a fost atins
-        if (touched[name]) {
-            const result = validateFieldOnChange(name, value, validationRules);
-            setErrors(prev => ({
-                ...prev,
-                [name]: result.isValid ? '' : result.message
-            }));
-        }
-    }, [validationRules, touched]);
+        setTouched(prevTouched => {
+            if (prevTouched[name]) {
+                const result = validateFieldOnChange(name, value, memoizedValidationRules);
+                setErrors(prevErrors => ({
+                    ...prevErrors,
+                    [name]: result.isValid ? '' : result.message
+                }));
+            }
+            return prevTouched;
+        });
+    }, [memoizedValidationRules]);
 
     // Marchează câmpul ca fiind atins (pentru validare în timp real)
     const handleBlur = useCallback((name) => {
@@ -35,27 +41,37 @@ export const useFormValidation = (initialValues, validationRules) => {
         }));
 
         // Validează câmpul la blur
-        const result = validateFieldOnChange(name, values[name], validationRules);
-        setErrors(prev => ({
-            ...prev,
-            [name]: result.isValid ? '' : result.message
-        }));
-    }, [values, validationRules]);
+        setValues(currentValues => {
+            const result = validateFieldOnChange(name, currentValues[name], memoizedValidationRules);
+            setErrors(prevErrors => ({
+                ...prevErrors,
+                [name]: result.isValid ? '' : result.message
+            }));
+            return currentValues;
+        });
+    }, [memoizedValidationRules]);
 
     // Validează întregul formular
     const validateAllFields = useCallback(() => {
-        const result = validateForm(values, validationRules);
-        setErrors(result.errors);
+        let isValid = true;
 
-        // Marchează toate câmpurile ca fiind atinse
-        const allTouched = Object.keys(validationRules).reduce((acc, field) => {
-            acc[field] = true;
-            return acc;
-        }, {});
-        setTouched(allTouched);
+        setValues(currentValues => {
+            const result = validateForm(currentValues, memoizedValidationRules);
+            setErrors(result.errors);
 
-        return result.isValid;
-    }, [values, validationRules]);
+            // Marchează toate câmpurile ca fiind atinse
+            const allTouched = Object.keys(memoizedValidationRules).reduce((acc, field) => {
+                acc[field] = true;
+                return acc;
+            }, {});
+            setTouched(allTouched);
+
+            isValid = result.isValid;
+            return currentValues;
+        });
+
+        return isValid;
+    }, [memoizedValidationRules]);
 
     // Resetează formularul
     const resetForm = useCallback(() => {
@@ -63,7 +79,7 @@ export const useFormValidation = (initialValues, validationRules) => {
         setErrors({});
         setTouched({});
         setIsSubmitting(false);
-    }, [initialValues]);
+    }, []); // FIXED: Removed initialValues from dependencies
 
     // Setează valorile formularului (pentru editare)
     const setFormValues = useCallback((newValues) => {
@@ -74,9 +90,9 @@ export const useFormValidation = (initialValues, validationRules) => {
 
     // Returnează true dacă formularul este valid
     const isFormValid = useCallback(() => {
-        const result = validateForm(values, validationRules);
+        const result = validateForm(values, memoizedValidationRules);
         return result.isValid;
-    }, [values, validationRules]);
+    }, [values, memoizedValidationRules]);
 
     // Setează starea de submit
     const setSubmitting = useCallback((submitting) => {
@@ -104,41 +120,51 @@ export const useFieldValidation = (initialValue, validationFn) => {
     const [error, setError] = useState('');
     const [touched, setTouched] = useState(false);
 
+    // FIXED: Memorizăm funcția de validare
+    const memoizedValidationFn = useCallback(validationFn, []);
+
     const handleChange = useCallback((newValue) => {
         setValue(newValue);
 
-        if (touched && validationFn) {
-            const result = validationFn(newValue);
+        if (touched && memoizedValidationFn) {
+            const result = memoizedValidationFn(newValue);
             setError(result.isValid ? '' : result.message);
         }
-    }, [touched, validationFn]);
+    }, [touched, memoizedValidationFn]);
 
     const handleBlur = useCallback(() => {
         setTouched(true);
 
-        if (validationFn) {
-            const result = validationFn(value);
-            setError(result.isValid ? '' : result.message);
-        }
-    }, [value, validationFn]);
+        setValue(currentValue => {
+            if (memoizedValidationFn) {
+                const result = memoizedValidationFn(currentValue);
+                setError(result.isValid ? '' : result.message);
+            }
+            return currentValue;
+        });
+    }, [memoizedValidationFn]);
 
     const validate = useCallback(() => {
         setTouched(true);
 
-        if (validationFn) {
-            const result = validationFn(value);
-            setError(result.isValid ? '' : result.message);
-            return result.isValid;
-        }
+        let isValid = true;
+        setValue(currentValue => {
+            if (memoizedValidationFn) {
+                const result = memoizedValidationFn(currentValue);
+                setError(result.isValid ? '' : result.message);
+                isValid = result.isValid;
+            }
+            return currentValue;
+        });
 
-        return true;
-    }, [value, validationFn]);
+        return isValid;
+    }, [memoizedValidationFn]);
 
     const reset = useCallback(() => {
         setValue(initialValue);
         setError('');
         setTouched(false);
-    }, [initialValue]);
+    }, []); // FIXED: Removed initialValue from dependencies
 
     return {
         value,

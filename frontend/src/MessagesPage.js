@@ -2,13 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './MessagesPage.css';
 
-// Import-uri pentru validare
-import { useFormValidation } from './hooks/useFormValidation';
-import { validateMessage } from './utils/validation';
-import ValidatedInput from './components/forms/ValidatedInput';
-import ValidatedTextarea from './components/forms/ValidatedTextarea';
-import ValidatedSelect from './components/forms/ValidatedSelect';
-
 function MessagesPage() {
     const [user, setUser] = useState(null);
     const [conversations, setConversations] = useState([]);
@@ -19,48 +12,18 @@ function MessagesPage() {
     const [users, setUsers] = useState([]);
     const [showNewMessageModal, setShowNewMessageModal] = useState(false);
 
+    // Simplified form states without complex validation hooks
+    const [newMessage, setNewMessage] = useState('');
+    const [messageError, setMessageError] = useState('');
+    const [messageSubmitting, setMessageSubmitting] = useState(false);
+
+    const [selectedRecipient, setSelectedRecipient] = useState('');
+    const [newConversationMessage, setNewConversationMessage] = useState('');
+    const [recipientError, setRecipientError] = useState('');
+    const [conversationMessageError, setConversationMessageError] = useState('');
+    const [conversationSubmitting, setConversationSubmitting] = useState(false);
+
     const messagesEndRef = useRef(null);
-
-    // Hook de validare pentru mesajul curent în conversație
-    const {
-        values: messageFormData,
-        errors: messageErrors,
-        touched: messageTouched,
-        isSubmitting: messageSubmitting,
-        handleChange: handleMessageChange,
-        handleBlur: handleMessageBlur,
-        validateAllFields: validateMessageFields,
-        setSubmitting: setMessageSubmitting,
-        resetForm: resetMessageForm
-    } = useFormValidation({
-        newMessage: ''
-    }, {
-        newMessage: [validateMessage]
-    });
-
-    // Hook de validare pentru noul mesaj/conversație
-    const {
-        values: newConversationData,
-        errors: newConversationErrors,
-        touched: newConversationTouched,
-        isSubmitting: newConversationSubmitting,
-        handleChange: handleNewConversationChange,
-        handleBlur: handleNewConversationBlur,
-        validateAllFields: validateNewConversationFields,
-        setSubmitting: setNewConversationSubmitting,
-        resetForm: resetNewConversationForm
-    } = useFormValidation({
-        selectedRecipient: '',
-        newConversationMessage: ''
-    }, {
-        selectedRecipient: [(recipient) => {
-            if (!recipient || recipient.trim() === '') {
-                return { isValid: false, message: 'Selectează un destinatar' };
-            }
-            return { isValid: true, message: '' };
-        }],
-        newConversationMessage: [validateMessage]
-    });
 
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user'));
@@ -130,6 +93,16 @@ function MessagesPage() {
         }
     };
 
+    const validateMessage = (message) => {
+        if (!message || !message.trim()) {
+            return 'Mesajul nu poate fi gol';
+        }
+        if (message.length > 2000) {
+            return 'Mesajul nu poate avea mai mult de 2000 de caractere';
+        }
+        return '';
+    };
+
     const sendMessage = async (recipientId, content) => {
         if (!content.trim()) return;
 
@@ -165,17 +138,19 @@ function MessagesPage() {
             return;
         }
 
-        // Validează mesajul
-        if (!validateMessageFields()) {
-            return; // Eroarea este afișată automat
+        const error = validateMessage(newMessage);
+        if (error) {
+            setMessageError(error);
+            return;
         }
 
+        setMessageError('');
         setMessageSubmitting(true);
 
         try {
-            const success = await sendMessage(selectedConversation.id, messageFormData.newMessage);
+            const success = await sendMessage(selectedConversation.id, newMessage);
             if (success) {
-                resetMessageForm();
+                setNewMessage('');
             }
         } catch (error) {
             console.error('Error sending message:', error);
@@ -187,25 +162,33 @@ function MessagesPage() {
     const handleNewConversation = async (e) => {
         e.preventDefault();
 
-        // Validează formularul pentru conversația nouă
-        if (!validateNewConversationFields()) {
-            return; // Erorile sunt afișate automat
+        // Validate recipient
+        if (!selectedRecipient) {
+            setRecipientError('Selectează un destinatar');
+            return;
         }
+        setRecipientError('');
 
-        setNewConversationSubmitting(true);
+        // Validate message
+        const messageErr = validateMessage(newConversationMessage);
+        if (messageErr) {
+            setConversationMessageError(messageErr);
+            return;
+        }
+        setConversationMessageError('');
+
+        setConversationSubmitting(true);
 
         try {
-            const success = await sendMessage(
-                parseInt(newConversationData.selectedRecipient),
-                newConversationData.newConversationMessage
-            );
+            const success = await sendMessage(parseInt(selectedRecipient), newConversationMessage);
 
             if (success) {
-                resetNewConversationForm();
+                setSelectedRecipient('');
+                setNewConversationMessage('');
                 setShowNewMessageModal(false);
 
                 // Select the new conversation
-                const recipient = users.find(u => u.id === parseInt(newConversationData.selectedRecipient));
+                const recipient = users.find(u => u.id === parseInt(selectedRecipient));
                 if (recipient) {
                     setSelectedConversation({
                         id: recipient.id,
@@ -218,13 +201,25 @@ function MessagesPage() {
         } catch (error) {
             console.error('Error creating new conversation:', error);
         } finally {
-            setNewConversationSubmitting(false);
+            setConversationSubmitting(false);
         }
     };
 
     const handleConversationSelect = (conversation) => {
-        setSelectedConversation(conversation);
-        fetchConversation(conversation.senderId === user.id ? conversation.recipientId : conversation.senderId);
+        if (!user) return;
+
+        const otherUser = conversation.senderId === user.id ? {
+            id: conversation.recipientId,
+            name: conversation.recipientName,
+            role: conversation.recipientRole
+        } : {
+            id: conversation.senderId,
+            name: conversation.senderName,
+            role: conversation.senderRole
+        };
+
+        setSelectedConversation(otherUser);
+        fetchConversation(otherUser.id);
     };
 
     const formatTime = (timestamp) => {
@@ -237,6 +232,8 @@ function MessagesPage() {
     };
 
     const getOtherUserFromConversation = (conversation) => {
+        if (!user) return null;
+
         return conversation.senderId === user.id ? {
             id: conversation.recipientId,
             name: conversation.recipientName,
@@ -286,16 +283,15 @@ function MessagesPage() {
                         <div className="conversations-list">
                             {conversations.map((conversation, index) => {
                                 const otherUser = getOtherUserFromConversation(conversation);
+                                if (!otherUser) return null;
+
                                 return (
                                     <div
                                         key={`${conversation.id}-${index}`}
                                         className={`conversation-item ${
                                             selectedConversation?.id === otherUser.id ? 'active' : ''
                                         }`}
-                                        onClick={() => {
-                                            setSelectedConversation(otherUser);
-                                            fetchConversation(otherUser.id);
-                                        }}
+                                        onClick={() => handleConversationSelect(conversation)}
                                     >
                                         <div className="conversation-info">
                                             <h4>{otherUser.name}</h4>
@@ -357,24 +353,29 @@ function MessagesPage() {
                             </div>
 
                             <form className="message-input-form" onSubmit={handleSendMessage}>
-                                <ValidatedInput
-                                    type="text"
-                                    name="newMessage"
-                                    value={messageFormData.newMessage}
-                                    onChange={handleMessageChange}
-                                    onBlur={handleMessageBlur}
-                                    error={messageErrors.newMessage}
-                                    placeholder="Scrie un mesaj..."
-                                    disabled={messageSubmitting}
-                                    className="message-input-field"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={messageSubmitting || !validateMessageFields()}
-                                    className="message-send-button"
-                                >
-                                    {messageSubmitting ? 'Se trimite...' : 'Trimite'}
-                                </button>
+                                <div className="input-group">
+                                    <input
+                                        type="text"
+                                        value={newMessage}
+                                        onChange={(e) => {
+                                            setNewMessage(e.target.value);
+                                            if (messageError) setMessageError('');
+                                        }}
+                                        placeholder="Scrie un mesaj..."
+                                        disabled={messageSubmitting}
+                                        className={`message-input-field ${messageError ? 'error' : ''}`}
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={messageSubmitting || !newMessage.trim()}
+                                        className="message-send-button"
+                                    >
+                                        {messageSubmitting ? 'Se trimite...' : 'Trimite'}
+                                    </button>
+                                </div>
+                                {messageError && (
+                                    <div className="error-message">{messageError}</div>
+                                )}
                             </form>
                         </>
                     ) : (
@@ -400,54 +401,71 @@ function MessagesPage() {
                             </button>
                         </div>
                         <form onSubmit={handleNewConversation}>
-                            <ValidatedSelect
-                                name="selectedRecipient"
-                                value={newConversationData.selectedRecipient}
-                                onChange={handleNewConversationChange}
-                                onBlur={handleNewConversationBlur}
-                                error={newConversationErrors.selectedRecipient}
-                                label="Destinatar"
-                                placeholder="Selectează un utilizator..."
-                                required
-                                disabled={newConversationSubmitting}
-                                options={availableUsers.map(u => ({
-                                    value: u.id,
-                                    label: `${u.name} (${u.role === 'OWNER' ? 'Proprietar' :
-                                        u.role === 'TENANT' ? 'Chiriaș' : 'Administrator'})`
-                                }))}
-                            />
+                            <div className="form-group">
+                                <label>Destinatar *</label>
+                                <select
+                                    value={selectedRecipient}
+                                    onChange={(e) => {
+                                        setSelectedRecipient(e.target.value);
+                                        if (recipientError) setRecipientError('');
+                                    }}
+                                    disabled={conversationSubmitting}
+                                    className={recipientError ? 'error' : ''}
+                                >
+                                    <option value="">Selectează un utilizator...</option>
+                                    {availableUsers.map(u => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name} ({u.role === 'OWNER' ? 'Proprietar' :
+                                            u.role === 'TENANT' ? 'Chiriaș' : 'Administrator'})
+                                        </option>
+                                    ))}
+                                </select>
+                                {recipientError && (
+                                    <div className="error-message">{recipientError}</div>
+                                )}
+                            </div>
 
-                            <ValidatedTextarea
-                                name="newConversationMessage"
-                                value={newConversationData.newConversationMessage}
-                                onChange={handleNewConversationChange}
-                                onBlur={handleNewConversationBlur}
-                                error={newConversationErrors.newConversationMessage}
-                                label="Mesaj"
-                                placeholder="Scrie mesajul tău aici..."
-                                rows={4}
-                                maxLength={2000}
-                                showCharCount={true}
-                                required
-                                disabled={newConversationSubmitting}
-                            />
+                            <div className="form-group">
+                                <label>Mesaj *</label>
+                                <textarea
+                                    value={newConversationMessage}
+                                    onChange={(e) => {
+                                        setNewConversationMessage(e.target.value);
+                                        if (conversationMessageError) setConversationMessageError('');
+                                    }}
+                                    placeholder="Scrie mesajul tău aici..."
+                                    rows={4}
+                                    maxLength={2000}
+                                    disabled={conversationSubmitting}
+                                    className={conversationMessageError ? 'error' : ''}
+                                />
+                                <div className="char-count">
+                                    {newConversationMessage.length}/2000 caractere
+                                </div>
+                                {conversationMessageError && (
+                                    <div className="error-message">{conversationMessageError}</div>
+                                )}
+                            </div>
 
                             <div className="modal-actions">
                                 <button
                                     type="submit"
                                     className="btn btn-primary"
-                                    disabled={newConversationSubmitting || !validateNewConversationFields()}
+                                    disabled={conversationSubmitting || !selectedRecipient || !newConversationMessage.trim()}
                                 >
-                                    {newConversationSubmitting ? 'Se trimite...' : 'Trimite mesaj'}
+                                    {conversationSubmitting ? 'Se trimite...' : 'Trimite mesaj'}
                                 </button>
                                 <button
                                     type="button"
                                     className="btn btn-secondary"
                                     onClick={() => {
                                         setShowNewMessageModal(false);
-                                        resetNewConversationForm();
+                                        setSelectedRecipient('');
+                                        setNewConversationMessage('');
+                                        setRecipientError('');
+                                        setConversationMessageError('');
                                     }}
-                                    disabled={newConversationSubmitting}
+                                    disabled={conversationSubmitting}
                                 >
                                     Anulează
                                 </button>

@@ -1,34 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './CreateSpacePage.css';
 
-// ADĂUGAT: Import-uri pentru validare
-import { useFormValidation } from './hooks/useFormValidation';
-import { spaceValidationRules, validateCoordinates } from './utils/validation';
+// Import components for validation
 import ValidatedInput from './components/forms/ValidatedInput';
 import ValidatedTextarea from './components/forms/ValidatedTextarea';
 import ValidatedSelect from './components/forms/ValidatedSelect';
 
+// Assuming validation utils are defined elsewhere
+import { validateCoordinates } from './utils/validation';
+
 function CreateSpacePage() {
     const navigate = useNavigate();
+
+    // Basic state management
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
     const [buildings, setBuildings] = useState([]);
     const [user, setUser] = useState(null);
     const [error, setError] = useState('');
 
-    // ÎNLOCUIT: useState pentru formData cu useFormValidation
-    const {
-        values: formData,
-        errors,
-        touched,
-        isSubmitting,
-        handleChange,
-        handleBlur,
-        validateAllFields,
-        setSubmitting,
-        setFormValues
-    } = useFormValidation({
+    // Form state
+    const [formData, setFormData] = useState({
         name: '',
         description: '',
         area: 0,
@@ -38,75 +32,28 @@ function CreateSpacePage() {
         longitude: 0,
         spaceType: 'OFFICE',
         available: true,
-        // Proprietăți specifice pentru birouri
+        // Office-specific properties
         floors: 1,
         numberOfRooms: 1,
         hasReception: false,
-        // Proprietăți specifice pentru spații comerciale
+        // Retail-specific properties
         shopWindowSize: 0,
         hasCustomerEntrance: true,
         maxOccupancy: 0,
-        // Proprietăți specifice pentru depozite
+        // Warehouse-specific properties
         ceilingHeight: 0,
         hasLoadingDock: false,
         securityLevel: 'MEDIUM',
-        // Clădire și alte relații
+        // Building and other relationships
         buildingId: '',
         amenities: []
-    }, {
-        ...spaceValidationRules,
-        // Validări suplimentare
-        buildingId: [(id) => id ? { isValid: true, message: '' } : { isValid: false, message: 'Selectează o clădire' }],
-        coordinates: [() => {
-            const coordResult = validateCoordinates(formData.latitude, formData.longitude);
-            if (!coordResult.isValid) {
-                return {
-                    isValid: false,
-                    message: Object.values(coordResult.errors).join(', ')
-                };
-            }
-            return { isValid: true, message: '' };
-        }],
-        // Validări specifice pentru tipuri de spații
-        floors: [(floors) => {
-            if (formData.spaceType === 'OFFICE' && (!floors || floors < 1)) {
-                return { isValid: false, message: 'Numărul de etaje este obligatoriu pentru birouri' };
-            }
-            if (floors && (floors < 1 || floors > 50)) {
-                return { isValid: false, message: 'Numărul de etaje trebuie să fie între 1 și 50' };
-            }
-            return { isValid: true, message: '' };
-        }],
-        numberOfRooms: [(rooms) => {
-            if (formData.spaceType === 'OFFICE' && (!rooms || rooms < 1)) {
-                return { isValid: false, message: 'Numărul de camere este obligatoriu pentru birouri' };
-            }
-            if (rooms && (rooms < 1 || rooms > 100)) {
-                return { isValid: false, message: 'Numărul de camere trebuie să fie între 1 și 100' };
-            }
-            return { isValid: true, message: '' };
-        }],
-        shopWindowSize: [(size) => {
-            if (formData.spaceType === 'RETAIL' && size && (size < 0 || size > 50)) {
-                return { isValid: false, message: 'Dimensiunea vitrinei trebuie să fie între 0 și 50 metri' };
-            }
-            return { isValid: true, message: '' };
-        }],
-        maxOccupancy: [(occupancy) => {
-            if (formData.spaceType === 'RETAIL' && occupancy && (occupancy < 0 || occupancy > 1000)) {
-                return { isValid: false, message: 'Capacitatea maximă trebuie să fie între 0 și 1000 persoane' };
-            }
-            return { isValid: true, message: '' };
-        }],
-        ceilingHeight: [(height) => {
-            if (formData.spaceType === 'WAREHOUSE' && height && (height < 0 || height > 30)) {
-                return { isValid: false, message: 'Înălțimea tavanului trebuie să fie între 0 și 30 metri' };
-            }
-            return { isValid: true, message: '' };
-        }]
     });
 
-    // Lista de facilități pentru checkbox-uri
+    // Validation state
+    const [errors, setErrors] = useState({});
+    const [touched, setTouched] = useState({});
+
+    // Amenities options
     const amenitiesOptions = [
         { id: 'air-conditioning', label: 'Aer condiționat' },
         { id: 'heating', label: 'Încălzire' },
@@ -122,6 +69,7 @@ function CreateSpacePage() {
         { id: 'storage', label: 'Spațiu depozitare' }
     ];
 
+    // Load user and buildings on component mount
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user'));
         if (!storedUser || (storedUser.role !== 'OWNER' && storedUser.role !== 'ADMIN')) {
@@ -135,9 +83,9 @@ function CreateSpacePage() {
                 const response = await axios.get('http://localhost:8080/buildings');
                 setBuildings(response.data);
 
-                // Setează implicit prima clădire dacă există
+                // Set default building if available
                 if (response.data.length > 0) {
-                    setFormValues(prev => ({
+                    setFormData(prev => ({
                         ...prev,
                         buildingId: response.data[0].id
                     }));
@@ -149,10 +97,24 @@ function CreateSpacePage() {
         };
 
         fetchBuildings();
-    }, [navigate, setFormValues]);
+    }, [navigate]);
 
-    // ACTUALIZAT: handleAmenityChange pentru a lucra cu hook-ul de validare
-    const handleAmenityChange = (e) => {
+    // Handle form field changes
+    const handleChange = useCallback((name, value) => {
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+
+        // Mark field as touched
+        setTouched(prev => ({
+            ...prev,
+            [name]: true
+        }));
+    }, []);
+
+    // Handle amenity checkboxes
+    const handleAmenityChange = useCallback((e) => {
         const { value, checked } = e.target;
         const currentAmenities = formData.amenities || [];
 
@@ -163,34 +125,216 @@ function CreateSpacePage() {
             newAmenities = currentAmenities.filter(amenity => amenity !== value);
         }
 
-        handleChange('amenities', newAmenities);
-    };
+        setFormData(prev => ({
+            ...prev,
+            amenities: newAmenities
+        }));
+    }, [formData.amenities]);
 
-    // ACTUALIZAT: handleSubmit cu validare
+    // Handle input blur for validation
+    const handleBlur = useCallback((name) => {
+        setTouched(prev => ({
+            ...prev,
+            [name]: true
+        }));
+        validateField(name);
+    }, []);
+
+    // Validate a specific field
+    const validateField = useCallback((fieldName) => {
+        const newErrors = { ...errors };
+
+        switch (fieldName) {
+            case 'name':
+                if (!formData.name) {
+                    newErrors.name = 'Denumirea spațiului este obligatorie';
+                } else if (formData.name.length < 3) {
+                    newErrors.name = 'Denumirea trebuie să aibă cel puțin 3 caractere';
+                } else {
+                    delete newErrors.name;
+                }
+                break;
+
+            case 'description':
+                if (formData.description && formData.description.length < 10) {
+                    newErrors.description = 'Descrierea trebuie să aibă cel puțin 10 caractere';
+                } else {
+                    delete newErrors.description;
+                }
+                break;
+
+            case 'area':
+                if (!formData.area) {
+                    newErrors.area = 'Suprafața este obligatorie';
+                } else if (formData.area <= 0 || formData.area > 10000) {
+                    newErrors.area = 'Suprafața trebuie să fie între 0 și 10000 m²';
+                } else {
+                    delete newErrors.area;
+                }
+                break;
+
+            case 'pricePerMonth':
+                if (!formData.pricePerMonth) {
+                    newErrors.pricePerMonth = 'Prețul este obligatoriu';
+                } else if (formData.pricePerMonth <= 0 || formData.pricePerMonth > 100000) {
+                    newErrors.pricePerMonth = 'Prețul trebuie să fie între 0 și 100000 €';
+                } else {
+                    delete newErrors.pricePerMonth;
+                }
+                break;
+
+            case 'buildingId':
+                if (!formData.buildingId) {
+                    newErrors.buildingId = 'Selectarea clădirii este obligatorie';
+                } else {
+                    delete newErrors.buildingId;
+                }
+                break;
+
+            case 'latitude':
+            case 'longitude':
+                // Validate coordinates together
+                const coordResult = validateCoordinates(formData.latitude, formData.longitude);
+                if (!coordResult.isValid) {
+                    newErrors.coordinates = Object.values(coordResult.errors).join(', ');
+                } else {
+                    delete newErrors.coordinates;
+                }
+                break;
+
+            // Type-specific validations
+            case 'floors':
+                if (formData.spaceType === 'OFFICE') {
+                    if (!formData.floors || formData.floors < 1) {
+                        newErrors.floors = 'Numărul de etaje este obligatoriu pentru birouri';
+                    } else if (formData.floors > 50) {
+                        newErrors.floors = 'Numărul de etaje trebuie să fie între 1 și 50';
+                    } else {
+                        delete newErrors.floors;
+                    }
+                } else {
+                    delete newErrors.floors;
+                }
+                break;
+
+            case 'numberOfRooms':
+                if (formData.spaceType === 'OFFICE') {
+                    if (!formData.numberOfRooms || formData.numberOfRooms < 1) {
+                        newErrors.numberOfRooms = 'Numărul de camere este obligatoriu pentru birouri';
+                    } else if (formData.numberOfRooms > 100) {
+                        newErrors.numberOfRooms = 'Numărul de camere trebuie să fie între 1 și 100';
+                    } else {
+                        delete newErrors.numberOfRooms;
+                    }
+                } else {
+                    delete newErrors.numberOfRooms;
+                }
+                break;
+
+            case 'shopWindowSize':
+                if (formData.spaceType === 'RETAIL' && formData.shopWindowSize && (formData.shopWindowSize < 0 || formData.shopWindowSize > 50)) {
+                    newErrors.shopWindowSize = 'Dimensiunea vitrinei trebuie să fie între 0 și 50 metri';
+                } else {
+                    delete newErrors.shopWindowSize;
+                }
+                break;
+
+            case 'maxOccupancy':
+                if (formData.spaceType === 'RETAIL' && formData.maxOccupancy && (formData.maxOccupancy < 0 || formData.maxOccupancy > 1000)) {
+                    newErrors.maxOccupancy = 'Capacitatea maximă trebuie să fie între 0 și 1000 persoane';
+                } else {
+                    delete newErrors.maxOccupancy;
+                }
+                break;
+
+            case 'ceilingHeight':
+                if (formData.spaceType === 'WAREHOUSE' && formData.ceilingHeight && (formData.ceilingHeight < 0 || formData.ceilingHeight > 30)) {
+                    newErrors.ceilingHeight = 'Înălțimea tavanului trebuie să fie între 0 și 30 metri';
+                } else {
+                    delete newErrors.ceilingHeight;
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    }, [formData, errors]);
+
+    // Run validation when space type changes
+    useEffect(() => {
+        if (formData.spaceType === 'OFFICE') {
+            validateField('floors');
+            validateField('numberOfRooms');
+        } else if (formData.spaceType === 'RETAIL') {
+            validateField('shopWindowSize');
+            validateField('maxOccupancy');
+        } else if (formData.spaceType === 'WAREHOUSE') {
+            validateField('ceilingHeight');
+        }
+    }, [formData.spaceType, validateField]);
+
+    // Validate all fields and return if valid
+    const validateAllFields = useCallback(() => {
+        const fieldsToValidate = [
+            'name', 'area', 'pricePerMonth', 'buildingId',
+            'latitude', 'longitude'
+        ];
+
+        // Add type-specific fields
+        if (formData.spaceType === 'OFFICE') {
+            fieldsToValidate.push('floors', 'numberOfRooms');
+        } else if (formData.spaceType === 'RETAIL') {
+            fieldsToValidate.push('shopWindowSize', 'maxOccupancy');
+        } else if (formData.spaceType === 'WAREHOUSE') {
+            fieldsToValidate.push('ceilingHeight');
+        }
+
+        // Mark all as touched
+        const newTouched = {};
+        fieldsToValidate.forEach(field => {
+            newTouched[field] = true;
+        });
+        setTouched(prev => ({ ...prev, ...newTouched }));
+
+        // Validate each field
+        let isValid = true;
+        fieldsToValidate.forEach(field => {
+            if (!validateField(field)) {
+                isValid = false;
+            }
+        });
+
+        return isValid;
+    }, [formData.spaceType, validateField]);
+
+    // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
-        // Validează toate câmpurile
+        // Validate all fields
         if (!validateAllFields()) {
             setError('Te rugăm să corectezi erorile din formular înainte de a continua.');
             return;
         }
 
-        // CRITICAL FIX: Ensure buildingId is properly set
+        // Ensure buildingId is properly set
         if (!formData.buildingId || formData.buildingId === '') {
             setError('Vă rugăm să selectați o clădire.');
             return;
         }
 
-        setSubmitting(true);
+        setIsSubmitting(true);
 
         try {
             console.log('=== CREATE SPACE FRONTEND DEBUG ===');
             console.log('User:', user);
             console.log('Form data before processing:', formData);
 
-            // CRITICAL FIX: Create proper data structure matching backend DTO
+            // Create proper data structure matching backend DTO
             const spaceData = {
                 name: formData.name,
                 description: formData.description,
@@ -202,7 +346,7 @@ function CreateSpacePage() {
                 spaceType: formData.spaceType,
                 available: formData.available,
                 amenities: formData.amenities || [],
-                // Type-specific fields (doar dacă au valori)
+                // Type-specific fields (only if they have values)
                 floors: formData.floors ? parseInt(formData.floors) : null,
                 numberOfRooms: formData.numberOfRooms ? parseInt(formData.numberOfRooms) : null,
                 hasReception: Boolean(formData.hasReception),
@@ -212,7 +356,7 @@ function CreateSpacePage() {
                 ceilingHeight: formData.ceilingHeight ? parseFloat(formData.ceilingHeight) : null,
                 hasLoadingDock: Boolean(formData.hasLoadingDock),
                 securityLevel: formData.securityLevel || 'MEDIUM',
-                // CRITICAL FIX: Send IDs directly instead of objects
+                // Send IDs directly instead of objects
                 ownerId: user.id,
                 buildingId: parseInt(formData.buildingId)
             };
@@ -260,10 +404,11 @@ function CreateSpacePage() {
                 setError('Nu s-a putut crea spațiul. Verificați datele introduse și încercați din nou.');
             }
         } finally {
-            setSubmitting(false);
+            setIsSubmitting(false);
         }
     };
 
+    // Render fields specific to the selected space type
     const renderTypeSpecificFields = () => {
         switch (formData.spaceType) {
             case 'OFFICE':
@@ -275,8 +420,8 @@ function CreateSpacePage() {
                                 type="number"
                                 name="floors"
                                 value={formData.floors}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
+                                onChange={(e) => handleChange('floors', e.target.value)}
+                                onBlur={() => handleBlur('floors')}
                                 error={errors.floors}
                                 label="Număr de etaje"
                                 placeholder="Ex: 2"
@@ -289,8 +434,8 @@ function CreateSpacePage() {
                                 type="number"
                                 name="numberOfRooms"
                                 value={formData.numberOfRooms}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
+                                onChange={(e) => handleChange('numberOfRooms', e.target.value)}
+                                onBlur={() => handleBlur('numberOfRooms')}
                                 error={errors.numberOfRooms}
                                 label="Număr de camere"
                                 placeholder="Ex: 5"
@@ -322,8 +467,8 @@ function CreateSpacePage() {
                                 type="number"
                                 name="shopWindowSize"
                                 value={formData.shopWindowSize}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
+                                onChange={(e) => handleChange('shopWindowSize', e.target.value)}
+                                onBlur={() => handleBlur('shopWindowSize')}
                                 error={errors.shopWindowSize}
                                 label="Dimensiune vitrină (m)"
                                 placeholder="Ex: 3.5"
@@ -337,8 +482,8 @@ function CreateSpacePage() {
                                 type="number"
                                 name="maxOccupancy"
                                 value={formData.maxOccupancy}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
+                                onChange={(e) => handleChange('maxOccupancy', e.target.value)}
+                                onBlur={() => handleBlur('maxOccupancy')}
                                 error={errors.maxOccupancy}
                                 label="Capacitate maximă (persoane)"
                                 placeholder="Ex: 50"
@@ -370,8 +515,8 @@ function CreateSpacePage() {
                                 type="number"
                                 name="ceilingHeight"
                                 value={formData.ceilingHeight}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
+                                onChange={(e) => handleChange('ceilingHeight', e.target.value)}
+                                onBlur={() => handleBlur('ceilingHeight')}
                                 error={errors.ceilingHeight}
                                 label="Înălțime tavan (m)"
                                 placeholder="Ex: 4.5"
@@ -384,8 +529,8 @@ function CreateSpacePage() {
                             <ValidatedSelect
                                 name="securityLevel"
                                 value={formData.securityLevel}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
+                                onChange={(e) => handleChange('securityLevel', e.target.value)}
+                                onBlur={() => handleBlur('securityLevel')}
                                 error={errors.securityLevel}
                                 label="Nivel de securitate"
                                 disabled={isSubmitting}
@@ -415,6 +560,7 @@ function CreateSpacePage() {
         }
     };
 
+    // Check if user is authorized
     if (!user || (user.role !== 'OWNER' && user.role !== 'ADMIN')) {
         return <div className="loading-container">Redirecționare...</div>;
     }
@@ -438,9 +584,9 @@ function CreateSpacePage() {
                         type="text"
                         name="name"
                         value={formData.name}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={errors.name}
+                        onChange={(e) => handleChange('name', e.target.value)}
+                        onBlur={() => handleBlur('name')}
+                        error={touched.name ? errors.name : ''}
                         label="Denumire Spațiu"
                         placeholder="Ex: Birou modern în centrul orașului"
                         required
@@ -450,9 +596,9 @@ function CreateSpacePage() {
                     <ValidatedTextarea
                         name="description"
                         value={formData.description}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={errors.description}
+                        onChange={(e) => handleChange('description', e.target.value)}
+                        onBlur={() => handleBlur('description')}
+                        error={touched.description ? errors.description : ''}
                         label="Descriere"
                         placeholder="Descrierea detaliată a spațiului..."
                         rows={4}
@@ -466,9 +612,9 @@ function CreateSpacePage() {
                             type="number"
                             name="area"
                             value={formData.area}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={errors.area}
+                            onChange={(e) => handleChange('area', e.target.value)}
+                            onBlur={() => handleBlur('area')}
+                            error={touched.area ? errors.area : ''}
                             label="Suprafață (m²)"
                             placeholder="Ex: 50"
                             step="0.01"
@@ -482,9 +628,9 @@ function CreateSpacePage() {
                             type="number"
                             name="pricePerMonth"
                             value={formData.pricePerMonth}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={errors.pricePerMonth}
+                            onChange={(e) => handleChange('pricePerMonth', e.target.value)}
+                            onBlur={() => handleBlur('pricePerMonth')}
+                            error={touched.pricePerMonth ? errors.pricePerMonth : ''}
                             label="Preț lunar (€)"
                             placeholder="Ex: 500"
                             min="0"
@@ -497,9 +643,9 @@ function CreateSpacePage() {
                     <ValidatedSelect
                         name="spaceType"
                         value={formData.spaceType}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={errors.spaceType}
+                        onChange={(e) => handleChange('spaceType', e.target.value)}
+                        onBlur={() => handleBlur('spaceType')}
+                        error={touched.spaceType ? errors.spaceType : ''}
                         label="Tip Spațiu"
                         required
                         disabled={isSubmitting}
@@ -517,9 +663,9 @@ function CreateSpacePage() {
                     <ValidatedSelect
                         name="buildingId"
                         value={formData.buildingId}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={errors.buildingId}
+                        onChange={(e) => handleChange('buildingId', e.target.value)}
+                        onBlur={() => handleBlur('buildingId')}
+                        error={touched.buildingId ? errors.buildingId : ''}
                         label="Clădire"
                         required
                         disabled={isSubmitting}
@@ -534,9 +680,9 @@ function CreateSpacePage() {
                         type="text"
                         name="address"
                         value={formData.address}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        error={errors.address}
+                        onChange={(e) => handleChange('address', e.target.value)}
+                        onBlur={() => handleBlur('address')}
+                        error={touched.address ? errors.address : ''}
                         label="Adresă/Detalii Locație"
                         placeholder="Ex: Etaj 3, Aripa Est"
                         disabled={isSubmitting}
@@ -547,9 +693,9 @@ function CreateSpacePage() {
                             type="number"
                             name="latitude"
                             value={formData.latitude}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={errors.latitude || (errors.coordinates && errors.coordinates.includes('Latitudine') ? errors.coordinates : '')}
+                            onChange={(e) => handleChange('latitude', e.target.value)}
+                            onBlur={() => handleBlur('latitude')}
+                            error={touched.latitude ? (errors.latitude || errors.coordinates) : ''}
                             label="Latitudine"
                             placeholder="Ex: 46.7712"
                             step="0.000001"
@@ -562,9 +708,9 @@ function CreateSpacePage() {
                             type="number"
                             name="longitude"
                             value={formData.longitude}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            error={errors.longitude || (errors.coordinates && errors.coordinates.includes('Longitudine') ? errors.coordinates : '')}
+                            onChange={(e) => handleChange('longitude', e.target.value)}
+                            onBlur={() => handleBlur('longitude')}
+                            error={touched.longitude ? (errors.longitude || errors.coordinates) : ''}
                             label="Longitudine"
                             placeholder="Ex: 23.6236"
                             step="0.000001"
@@ -575,7 +721,7 @@ function CreateSpacePage() {
                     </div>
                 </div>
 
-                {/* Afișează câmpurile specifice tipului de spațiu selectat */}
+                {/* Display fields specific to the selected space type */}
                 {renderTypeSpecificFields()}
 
                 <div className="form-section">
@@ -619,7 +765,7 @@ function CreateSpacePage() {
                     <button
                         type="submit"
                         className="btn btn-save"
-                        disabled={isSubmitting || !validateAllFields()}
+                        disabled={isSubmitting || Object.keys(errors).length > 0}
                     >
                         {isSubmitting ? 'Se creează...' : 'Creează Spațiu'}
                     </button>

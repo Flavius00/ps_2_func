@@ -7,6 +7,7 @@ import com.example.demo.mapper.UserMapper;
 import com.example.demo.model.User;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.service.AuthService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,10 +19,12 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthServiceImpl(UserRepository userRepository, UserMapper userMapper) {
+    public AuthServiceImpl(UserRepository userRepository, UserMapper userMapper, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.userMapper = userMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -35,7 +38,8 @@ public class AuthServiceImpl implements AuthService {
             User user = userOptional.get();
             System.out.println("AuthService: User found: " + user.getUsername());
 
-            if (user.getPassword().equals(loginRequest.getPassword())) {
+            // Verifică parola folosind BCrypt
+            if (passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
                 System.out.println("AuthService: Password match, login successful");
                 return userMapper.toLoginResponse(user);
             } else {
@@ -69,9 +73,13 @@ public class AuthServiceImpl implements AuthService {
         // Create user from DTO
         User user = userMapper.fromRegisterDTO(registerRequest);
 
+        // Criptează parola înainte de salvare
+        String encodedPassword = passwordEncoder.encode(registerRequest.getPassword());
+        user.setPassword(encodedPassword);
+
         // Save and return
         User savedUser = userRepository.save(user);
-        System.out.println("AuthService: User registered successfully: " + savedUser.getUsername());
+        System.out.println("AuthService: User registered successfully with encrypted password: " + savedUser.getUsername());
 
         return savedUser;
     }

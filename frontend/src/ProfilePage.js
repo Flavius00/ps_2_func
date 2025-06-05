@@ -3,59 +3,132 @@ import axios from 'axios';
 import './ProfilePage.css';
 import { useNavigate } from 'react-router-dom';
 
-// ADĂUGAT: Import-uri pentru validare
-import { useFormValidation } from './hooks/useFormValidation';
-import { userValidationRules } from './utils/validation';
-import ValidatedInput from './components/forms/ValidatedInput';
-import ValidatedTextarea from './components/forms/ValidatedTextarea';
+// Import validări simple
+import { validateEmail, validatePhone, validateName } from './utils/validation';
 
 function ProfilePage() {
     const [user, setUser] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
-    // ÎNLOCUIT: useState pentru formData cu useFormValidation
-    const {
-        values: formData,
-        errors,
-        touched,
-        isSubmitting,
-        handleChange,
-        handleBlur,
-        validateAllFields,
-        setSubmitting,
-        setFormValues
-    } = useFormValidation({
+    // Formularul de editare - state simplu
+    const [formData, setFormData] = useState({
         name: '',
         email: '',
         phone: '',
         address: ''
-    }, {
-        ...userValidationRules,
-        // Address nu e obligatoriu, dar validăm lungimea dacă e completat
-        address: [(addr) => {
-            if (!addr || addr.trim() === '') return { isValid: true, message: '' };
-            if (addr.length > 300) return { isValid: false, message: 'Adresa nu poate avea mai mult de 300 de caractere' };
-            return { isValid: true, message: '' };
-        }]
     });
+
+    // Erorile de validare
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user'));
         if (storedUser) {
             setUser(storedUser);
-            // ADĂUGAT: Setează valorile în formularul de validare
-            setFormValues({
+            // Setează datele în formular
+            setFormData({
                 name: storedUser.name || '',
                 email: storedUser.email || '',
                 phone: storedUser.phone || '',
                 address: storedUser.address || ''
             });
         }
-    }, [setFormValues]);
+    }, []);
 
-    // ACTUALIZAT: handleSave cu validare
+    // Validează un câmp individual
+    const validateField = (name, value) => {
+        let error = '';
+
+        switch (name) {
+            case 'name':
+                const nameResult = validateName(value);
+                error = nameResult.isValid ? '' : nameResult.message;
+                break;
+            case 'email':
+                const emailResult = validateEmail(value);
+                error = emailResult.isValid ? '' : emailResult.message;
+                break;
+            case 'phone':
+                const phoneResult = validatePhone(value);
+                error = phoneResult.isValid ? '' : phoneResult.message;
+                break;
+            case 'address':
+                if (value && value.length > 300) {
+                    error = 'Adresa nu poate avea mai mult de 300 de caractere';
+                }
+                break;
+            default:
+                break;
+        }
+
+        setErrors(prev => ({
+            ...prev,
+            [name]: error
+        }));
+
+        return error === '';
+    };
+
+    // Validează tot formularul
+    const validateAllFields = () => {
+        const newErrors = {};
+        let isValid = true;
+
+        // Validează numele
+        const nameResult = validateName(formData.name);
+        if (!nameResult.isValid) {
+            newErrors.name = nameResult.message;
+            isValid = false;
+        }
+
+        // Validează email-ul
+        const emailResult = validateEmail(formData.email);
+        if (!emailResult.isValid) {
+            newErrors.email = emailResult.message;
+            isValid = false;
+        }
+
+        // Validează telefonul
+        const phoneResult = validatePhone(formData.phone);
+        if (!phoneResult.isValid) {
+            newErrors.phone = phoneResult.message;
+            isValid = false;
+        }
+
+        // Validează adresa (opțională)
+        if (formData.address && formData.address.length > 300) {
+            newErrors.address = 'Adresa nu poate avea mai mult de 300 de caractere';
+            isValid = false;
+        }
+
+        setErrors(newErrors);
+        return isValid;
+    };
+
+    // Handler pentru schimbarea valorilor
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+
+        // Validează câmpul dacă are deja o eroare
+        if (errors[name]) {
+            validateField(name, value);
+        }
+    };
+
+    // Handler pentru blur (când utilizatorul iese din câmp)
+    const handleInputBlur = (e) => {
+        const { name, value } = e.target;
+        validateField(name, value);
+    };
+
     const handleSave = async () => {
         setErrorMessage("");
 
@@ -65,22 +138,22 @@ function ProfilePage() {
             return;
         }
 
-        setSubmitting(true);
+        setIsSubmitting(true);
 
         try {
             console.log('Saving user data:', formData);
             await axios.put(`http://localhost:8080/users/update/${user.id}`, formData);
 
-            // Fetch separat pentru a obține datele actualizate ale utilizatorului
+            // Fetch pentru a obține datele actualizate
             const fetchResponse = await axios.get(`http://localhost:8080/users/${user.id}`);
             const updatedUserData = fetchResponse.data;
-            console.log('Updated user data:', updatedUserData);
 
-            // Actualizează utilizatorul în localStorage și state
+            // Actualizează utilizatorul
             localStorage.setItem('user', JSON.stringify(updatedUserData));
             setUser(updatedUserData);
             setIsEditing(false);
             setErrorMessage("");
+            setErrors({});
         } catch (error) {
             console.error("Eroare la actualizarea profilului:", error);
             if (error.response && error.response.status === 400) {
@@ -89,20 +162,29 @@ function ProfilePage() {
                 setErrorMessage("Nu s-a putut actualiza profilul. Vă rugăm încercați din nou.");
             }
         } finally {
-            setSubmitting(false);
+            setIsSubmitting(false);
         }
     };
 
     const handleCancel = () => {
-        // ACTUALIZAT: Resetează la valorile utilizatorului curent
-        setFormValues({
-            name: user.name || '',
-            email: user.email || '',
-            phone: user.phone || '',
-            address: user.address || ''
-        });
+        // Resetează la valorile utilizatorului curent
+        if (user) {
+            setFormData({
+                name: user.name || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                address: user.address || ''
+            });
+        }
         setIsEditing(false);
         setErrorMessage("");
+        setErrors({});
+    };
+
+    const handleEdit = () => {
+        setIsEditing(true);
+        setErrorMessage("");
+        setErrors({});
     };
 
     const handleLogout = () => {
@@ -143,65 +225,79 @@ function ProfilePage() {
                             <h2>Editare Profil</h2>
                             {errorMessage && <div className="error-message">{errorMessage}</div>}
 
-                            {/* ÎNLOCUIT: Input-urile clasice cu ValidatedInput */}
-                            <ValidatedInput
-                                type="text"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                error={errors.name}
-                                label="Nume complet"
-                                placeholder="Ex: Ion Popescu"
-                                required
-                                disabled={isSubmitting}
-                            />
+                            <div className="form-group">
+                                <label htmlFor="name">Nume complet *</label>
+                                <input
+                                    type="text"
+                                    id="name"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleInputChange}
+                                    onBlur={handleInputBlur}
+                                    placeholder="Ex: Ion Popescu"
+                                    disabled={isSubmitting}
+                                    className={errors.name ? 'error' : ''}
+                                />
+                                {errors.name && <div className="field-error">{errors.name}</div>}
+                            </div>
 
-                            <ValidatedInput
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                error={errors.email}
-                                label="Email"
-                                placeholder="Ex: ion.popescu@email.com"
-                                required
-                                disabled={isSubmitting}
-                            />
+                            <div className="form-group">
+                                <label htmlFor="email">Email *</label>
+                                <input
+                                    type="email"
+                                    id="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleInputChange}
+                                    onBlur={handleInputBlur}
+                                    placeholder="Ex: ion.popescu@email.com"
+                                    disabled={isSubmitting}
+                                    className={errors.email ? 'error' : ''}
+                                />
+                                {errors.email && <div className="field-error">{errors.email}</div>}
+                            </div>
 
-                            <ValidatedInput
-                                type="tel"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                error={errors.phone}
-                                label="Telefon"
-                                placeholder="Ex: 0712345678"
-                                required
-                                disabled={isSubmitting}
-                            />
+                            <div className="form-group">
+                                <label htmlFor="phone">Telefon *</label>
+                                <input
+                                    type="tel"
+                                    id="phone"
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={handleInputChange}
+                                    onBlur={handleInputBlur}
+                                    placeholder="Ex: 0712345678"
+                                    disabled={isSubmitting}
+                                    className={errors.phone ? 'error' : ''}
+                                />
+                                {errors.phone && <div className="field-error">{errors.phone}</div>}
+                            </div>
 
-                            <ValidatedTextarea
-                                name="address"
-                                value={formData.address}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                error={errors.address}
-                                label="Adresă"
-                                placeholder="Ex: Str. Exemplu nr. 123, Cluj-Napoca"
-                                rows={3}
-                                maxLength={300}
-                                showCharCount={true}
-                                disabled={isSubmitting}
-                            />
+                            <div className="form-group">
+                                <label htmlFor="address">Adresă</label>
+                                <textarea
+                                    id="address"
+                                    name="address"
+                                    value={formData.address}
+                                    onChange={handleInputChange}
+                                    onBlur={handleInputBlur}
+                                    placeholder="Ex: Str. Exemplu nr. 123, Cluj-Napoca"
+                                    rows={3}
+                                    maxLength={300}
+                                    disabled={isSubmitting}
+                                    className={errors.address ? 'error' : ''}
+                                />
+                                {errors.address && <div className="field-error">{errors.address}</div>}
+                                <div className="char-count">
+                                    {formData.address?.length || 0}/300 caractere
+                                </div>
+                            </div>
 
                             <div className="form-actions">
                                 <button
                                     className="btn btn-save"
                                     onClick={handleSave}
-                                    disabled={isSubmitting || !validateAllFields()}
+                                    disabled={isSubmitting}
                                 >
                                     {isSubmitting ? 'Se salvează...' : 'Salvează'}
                                 </button>
@@ -218,7 +314,7 @@ function ProfilePage() {
                         <div className="profile-info">
                             <div className="profile-info-header">
                                 <h2>Informații profil</h2>
-                                <button className="btn btn-edit" onClick={() => setIsEditing(true)}>
+                                <button className="btn btn-edit" onClick={handleEdit}>
                                     Editează
                                 </button>
                             </div>
